@@ -1,0 +1,13 @@
+services:
+  ulpf:
+    build: .
+    ports:
+      - "5514:5514/udp"
+      - "8080:8080/tcp"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - ULPF_DLQ_THRESHOLD=3
+      # If you have a local Ollama running on the host for self-heal:
+      # - ULPF_OLLAMA_URL=http://host.docker.internal:11434
+    restart: unless-stopped

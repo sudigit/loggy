@@ -1,0 +1,31 @@
+# Source: pfSense firewall filterlog (syslog, space-delimited key=value)
+# Sample raw line:
+#   Sep 16 10:22:01 pfsense filterlog: rule 12 block in on em0 src=10.1.2.3 dst=192.168.1.5 proto=tcp
+source_id: pfsense
+version: v1
+channel: udp:5514
+
+fingerprint:
+  type: contains
+  pattern: "filterlog:"
+
+tokenize:
+  type: regex
+  pattern: 'rule (?P<rule>\d+) (?P<disposition>\w+) in on (?P<iface>\S+) src=(?P<src>\S+) dst=(?P<dst>\S+) proto=(?P<proto>\w+)'
+
+mapping:
+  fields:
+    src: src_endpoint.ip
+    dst: dst_endpoint.ip
+    proto: connection_info.protocol_name
+    iface: connection_info.interface
+    disposition: disposition
+    rule: metadata.rule_id
+  values:
+    disposition:
+      block: "Blocked"
+      pass: "Allowed"
+  timestamp:
+    # classic BSD syslog has no year/timezone in the line itself -- rather
+    # than guess, fall back to the framework's ingest wall-clock (see engine.py)
+    source: ingest_time

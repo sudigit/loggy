@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/raw/*
+data/normalized/*
+data/parquet/*
+data/incoming/*.log
+data/dlq.sqlite3
+!data/raw/.gitkeep
+!data/normalized/.gitkeep
+!data/incoming/.gitkeep

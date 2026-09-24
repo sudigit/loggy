@@ -1,0 +1,25 @@
+# Source: Suricata IDS EVE JSON alert log
+# Sample raw line:
+#   {"timestamp":"2026-09-16T10:22:03+00:00","src_ip":"10.1.2.3","dest_ip":"192.168.1.5",
+#    "proto":"TCP","event_type":"alert","alert":{"signature":"ET SCAN Nmap"}}
+source_id: suricata
+version: v1
+channel: http
+
+fingerprint:
+  type: json_key
+  key: event_type
+
+tokenize:
+  type: json
+
+mapping:
+  fields:
+    src_ip: src_endpoint.ip
+    dest_ip: dst_endpoint.ip
+    proto: connection_info.protocol_name
+    event_type: class_name
+  values: {}
+  timestamp:
+    source: timestamp
+    format: iso8601

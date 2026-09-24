@@ -1,0 +1,1 @@
+1758013327.123 10.1.2.3 TCP_MISS/200 GET http://example.com

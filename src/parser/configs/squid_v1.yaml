@@ -1,0 +1,25 @@
+# Source: Squid proxy access.log
+# Sample raw line:
+#   1758013327.123 10.1.2.3 TCP_MISS/200 GET http://example.com
+source_id: squid
+version: v1
+channel: "file:squid"
+
+fingerprint:
+  type: regex
+  pattern: '^\d+\.\d+\s+\S+\s+\S+/\d+\s+\S+\s+\S+'
+
+tokenize:
+  type: regex
+  pattern: '^(?P<epoch>\d+\.\d+)\s+(?P<src>\S+)\s+(?P<status>\S+)\s+(?P<method>\S+)\s+(?P<url>\S+)'
+
+mapping:
+  fields:
+    src: src_endpoint.ip
+    status: http.cache_status
+    method: http.method
+    url: http.url
+  values: {}
+  timestamp:
+    source: epoch
+    format: epoch
