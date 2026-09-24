@@ -1,22 +1,69 @@
 """
 HTTP surface for the framework:
-  POST /ingest        -- push a log event in (used for JSON sources like Suricata,
-                          and generally for any source that prefers HTTP over syslog)
-  GET  /health         -- liveness
-  GET  /metrics         -- EPS, parse success rate, per-source breakdown
-  GET  /dlq             -- recent dead-lettered events (for the demo / debugging)
-  GET  /events/recent    -- last N normalized records for a given source
+  GET  /                  -- visual metrics dashboard
+  GET  /dashboard         -- visual metrics dashboard
+  GET  /selfheal          -- interactive DLQ & AI self-healing studio
+  GET  /api/dlq/pending   -- pending unparsed events grouped by channel
+  POST /api/selfheal/propose -- generate AI proposal YAML for a channel
+  POST /api/selfheal/promote -- regression-test & promote proposed YAML
+  POST /ingest            -- push a log event in (used for JSON sources like Suricata)
+  GET  /health            -- liveness
+  GET  /metrics           -- EPS, parse success rate, buffer backlog, storage mode
+  GET  /dlq               -- recent dead-lettered events (raw list)
+  GET  /events/recent     -- last N normalized records for a given source
+  GET  /events/stream     -- last N normalized records across all sources
 """
 import json
+from pathlib import Path
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 
 from src import config
 from src.core import metrics
 from src.dlq import store as dlq_store
 from src.pipeline import process_event
+from src.selfheal import service as selfheal_service
 
-app = Flask(__name__)
+template_dir = Path(__file__).resolve().parent / "templates"
+app = Flask(__name__, template_folder=str(template_dir))
+
+
+@app.get("/")
+@app.get("/dashboard")
+def dashboard_view():
+    return render_template("dashboard.html")
+
+
+@app.get("/selfheal")
+def selfheal_view():
+    return render_template("selfheal.html")
+
+
+@app.get("/api/dlq/pending")
+def api_dlq_pending():
+    return jsonify(selfheal_service.get_pending_summary())
+
+
+@app.post("/api/selfheal/propose")
+def api_selfheal_propose():
+    data = request.get_json(force=True, silent=True) or {}
+    channel = data.get("channel")
+    if not channel:
+        return jsonify({"error": "channel parameter required"}), 400
+    proposal = selfheal_service.generate_proposal_for_channel(channel)
+    return jsonify(proposal)
+
+
+@app.post("/api/selfheal/promote")
+def api_selfheal_promote():
+    data = request.get_json(force=True, silent=True) or {}
+    filename = data.get("filename")
+    yaml_content = data.get("yaml")
+    if not filename or not yaml_content:
+        return jsonify({"success": False, "error": "Missing filename or yaml content"}), 400
+
+    success, message = selfheal_service.promote_proposal_yaml(filename, yaml_content)
+    return jsonify({"success": success, "message": message if success else None, "error": message if not success else None})
 
 
 @app.post("/ingest")
@@ -62,6 +109,29 @@ def events_recent():
                 lines = f.readlines()[-n:]
             results = [json.loads(l) for l in lines]
     return jsonify(results)
+
+
+@app.get("/events/stream")
+def events_stream():
+    """Returns the most recent N normalized records across all registered sources."""
+    limit = int(request.args.get("n", 15))
+    all_events = []
+    if config.NORMALIZED_DIR.exists():
+        for source_dir in config.NORMALIZED_DIR.iterdir():
+            if source_dir.is_dir():
+                files = sorted(source_dir.glob("*.jsonl"))
+                if files:
+                    try:
+                        with open(files[-1]) as f:
+                            lines = f.readlines()[-limit:]
+                        for line in lines:
+                            if line.strip():
+                                all_events.append(json.loads(line))
+                    except Exception:
+                        pass
+    # Sort descending by ISO timestamp
+    all_events.sort(key=lambda x: x.get("time", ""), reverse=True)
+    return jsonify(all_events[:limit])
 
 
 def run(port: int = None):

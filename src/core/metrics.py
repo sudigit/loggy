@@ -23,12 +23,36 @@ def snapshot() -> dict:
         ingested = _counters.get("ingested", 0)
         parsed = _counters.get("parsed", 0)
         dlq = _counters.get("dlq", 0)
+        buffered = _counters.get("buffered", 0)
         uptime = max(time.time() - _started_at, 0.001)
+
+        # Query buffer status if module is loaded
+        buffer_mode = "direct"
+        backlog_size = 0
+        try:
+            from src.buffer import redis_buffer
+            buffer_mode = redis_buffer.get_buffer_mode()
+            backlog_size = redis_buffer.get_backlog_size()
+        except Exception:
+            pass
+
+        # Query raw store mode
+        raw_store_mode = "local"
+        try:
+            from src.core import raw_store
+            raw_store_mode = raw_store.get_store_mode()
+        except Exception:
+            pass
+
         return {
             "uptime_seconds": round(uptime, 1),
             "total_ingested": ingested,
             "total_parsed": parsed,
             "total_dlq": dlq,
+            "total_buffered": buffered,
+            "buffer_mode": buffer_mode,
+            "buffer_backlog": backlog_size,
+            "raw_store_mode": raw_store_mode,
             "parse_success_rate_pct": round((parsed / ingested * 100), 2) if ingested else None,
             "events_per_second": round(ingested / uptime, 2),
             "per_source": {k: dict(v) for k, v in _per_source.items()},

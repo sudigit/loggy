@@ -1,10 +1,11 @@
 """
-This is the one function every ingestion channel (syslog, HTTP, file
-watcher) calls. It is deliberately synchronous and single-process in this
-prototype -- the full architecture replaces the direct call below with a
-durable buffer (Redis Streams / Kafka) between ingestion and this stage so
-it can scale horizontally and survive a crash mid-batch. Swapping that in
-later does not change anything below this line.
+Pipeline coordinator for ULPF.
+
+Manages event ingestion flow:
+  1. Mint UUID and UTC timestamp.
+  2. Store raw bytes verbatim + SHA-256 hash in raw_store (forensic compliance).
+  3. Buffer event into Redis Stream (if enabled/available) for decoupled high-throughput processing.
+  4. If direct mode or Redis unavailable, executes parsing and normalization inline.
 """
 from src import config
 from src.core import ids, raw_store, metrics
@@ -22,18 +23,12 @@ def get_engine():
     return _engine
 
 
-def process_event(raw_bytes: bytes, channel: str, source_hint: str = None):
+def execute_event_processing(event_id: str, raw_bytes: bytes, channel: str,
+                             source_hint: str = None, ingest_time_iso: str = None) -> dict:
+    """Core deterministic parsing, schema normalization, and routing to writer/DLQ."""
     text = raw_bytes.decode("utf-8", errors="replace")
-    event_id = ids.new_event_id()
-    ingest_time_iso = ids.utc_now_iso()
-
-    # Step 1: preserve the original, verbatim and hashed, before anything
-    # else touches it. Whatever happens downstream, this copy is the truth.
+    ingest_time_iso = ingest_time_iso or ids.utc_now_iso()
     provisional_source = source_hint or channel.split(":")[-1]
-    raw_store.save(event_id, provisional_source, raw_bytes,
-                    meta={"channel": channel, "ingest_time": ingest_time_iso})
-    metrics.incr("ingested")
-    metrics.incr_source(provisional_source, "ingested")
 
     engine = get_engine()
     parser_config = engine.select(text, channel)
@@ -56,3 +51,41 @@ def process_event(raw_bytes: bytes, channel: str, source_hint: str = None):
     metrics.incr("parsed")
     metrics.incr_source(parser_config["source_id"], "parsed")
     return {"event_id": event_id, "status": "parsed", "source_id": parser_config["source_id"]}
+
+
+def process_event(raw_bytes: bytes, channel: str, source_hint: str = None) -> dict:
+    """
+    Entrypoint called by all ingestion listeners (syslog, HTTP, file watcher).
+    Guarantees raw forensic capture, then routes to Redis Stream or direct processing.
+    """
+    event_id = ids.new_event_id()
+    ingest_time_iso = ids.utc_now_iso()
+    provisional_source = source_hint or channel.split(":")[-1]
+
+    # Step 1: Preserve original verbatim and hashed before anything touches it
+    raw_store.save(event_id, provisional_source, raw_bytes,
+                   meta={"channel": channel, "ingest_time": ingest_time_iso})
+    metrics.incr("ingested")
+    metrics.incr_source(provisional_source, "ingested")
+
+    # Step 2: Try durable buffer (Redis Streams)
+    from src.buffer import redis_buffer
+    if redis_buffer.get_buffer_mode() == "redis":
+        pushed = redis_buffer.push_to_stream(
+            event_id=event_id,
+            raw_bytes=raw_bytes,
+            channel=channel,
+            source_hint=source_hint,
+            ingest_time_iso=ingest_time_iso,
+        )
+        if pushed:
+            return {"event_id": event_id, "status": "buffered", "channel": channel}
+
+    # Step 3: Direct execution fallback
+    return execute_event_processing(
+        event_id=event_id,
+        raw_bytes=raw_bytes,
+        channel=channel,
+        source_hint=source_hint,
+        ingest_time_iso=ingest_time_iso,
+    )

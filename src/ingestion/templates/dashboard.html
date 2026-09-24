@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ULPF — Universal Log Pre-processing Framework</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --purple: #8b5cf6;
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
+    
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--card-border); }
+    .header-title { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 36px; height: 36px; background: linear-gradient(135deg, var(--primary), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: #fff; }
+    .title-text h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .title-text p { font-size: 12px; color: var(--text-muted); }
+    .badges { display: flex; gap: 8px; align-items: center; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 6px; }
+    .badge-live { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite; }
+    .badge-redis { background: rgba(59, 130, 246, 0.15); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-minio { background: rgba(139, 92, 246, 0.15); color: var(--purple); border: 1px solid rgba(139, 92, 246, 0.3); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* Stat Cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 18px; position: relative; overflow: hidden; }
+    .stat-card::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .stat-card.c-ingest::after { background: var(--primary); }
+    .stat-card.c-parsed::after { background: var(--success); }
+    .stat-card.c-dlq::after { background: var(--danger); }
+    .stat-card.c-eps::after { background: var(--cyan); }
+    .stat-card.c-backlog::after { background: var(--purple); }
+    .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Visual Charts Grid */
+    .charts-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1024px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .chart-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .canvas-container { position: relative; width: 100%; flex: 1; min-height: 180px; display: flex; align-items: center; justify-content: center; }
+    canvas { width: 100% !important; height: 100% !important; }
+
+    /* Events Feed Table */
+    .feed-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 18px; }
+    .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .feed-table-wrapper { overflow-x: auto; max-height: 320px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+    th { color: var(--text-muted); padding: 10px 12px; font-weight: 600; border-bottom: 1px solid var(--card-border); text-transform: uppercase; font-size: 10px; }
+    td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
+    
+    .pill { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .pill-pfsense { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .pill-suricata { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .pill-squid { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .pill-other { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+    
+    .disp-pass { color: var(--success); font-weight: 600; }
+    .disp-block { color: var(--danger); font-weight: 600; }
+    .uid-tag { color: var(--text-muted); font-size: 11px; cursor: pointer; }
+    .uid-tag:hover { color: var(--primary); text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <div class="logo">U</div>
+      <div class="title-text">
+        <h1>Universal Log Pre-processing Framework (ULPF)</h1>
+        <p>Lossless OCSF Normalization & Forensics Telemetry Hub</p>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="badge badge-live">Pipeline Online</span>
+      <span class="badge badge-redis" id="bufferBadge">Redis: Direct</span>
+      <span class="badge badge-minio" id="storageBadge">Storage: Local</span>
+      <a href="/selfheal" style="text-decoration: none; padding: 5px 12px; border-radius: 6px; background: rgba(139, 92, 246, 0.2); color: #c084fc; font-size: 11px; font-weight: 600; border: 1px solid rgba(139, 92, 246, 0.4);">✨ AI Self-Healing Studio</a>
+      <a href="http://localhost:9001" target="_blank" style="text-decoration: none; padding: 5px 12px; border-radius: 6px; background: rgba(255, 255, 255, 0.05); color: #9ca3af; font-size: 11px; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.1);">🗄️ MinIO S3</a>
+    </div>
+  </div>
+
+  <!-- Real-time Stats Grid -->
+  <div class="stats-grid">
+    <div class="stat-card c-ingest">
+      <div class="stat-label">Total Ingested</div>
+      <div class="stat-value" id="valIngested">0</div>
+      <div class="stat-sub">Raw bytes hashed & preserved</div>
+    </div>
+    <div class="stat-card c-parsed">
+      <div class="stat-label">Normalized (OCSF)</div>
+      <div class="stat-value" id="valParsed" style="color: var(--success);">0</div>
+      <div class="stat-sub" id="subParseRate">Rate: 100%</div>
+    </div>
+    <div class="stat-card c-dlq">
+      <div class="stat-label">Dead-Letter Queue</div>
+      <div class="stat-value" id="valDlq" style="color: var(--danger);">0</div>
+      <div class="stat-sub">Quarantined for AI self-heal</div>
+    </div>
+    <div class="stat-card c-eps">
+      <div class="stat-label">Throughput Rate</div>
+      <div class="stat-value" id="valEps" style="color: var(--cyan);">0.0</div>
+      <div class="stat-sub">Events Per Second (EPS)</div>
+    </div>
+    <div class="stat-card c-backlog">
+      <div class="stat-label">Stream Backlog</div>
+      <div class="stat-value" id="valBacklog" style="color: var(--purple);">0</div>
+      <div class="stat-sub">Buffer queue depth</div>
+    </div>
+  </div>
+
+  <!-- Live Visual Charts -->
+  <div class="charts-grid">
+    <!-- Live EPS Timeline -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Live Throughput (Events / Sec)</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Last 30 seconds</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="epsCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Parse Health Donut -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Parse Health Ratio</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="healthCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Source Distribution -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="chart-title">Source Distribution</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="sourceCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Normalized Event Feed -->
+  <div class="feed-card">
+    <div class="feed-header">
+      <div class="chart-title">Live Normalized Stream (OCSF Schema)</div>
+      <div style="font-size: 11px; color: var(--text-muted);">Auto-updating every 1.5s</div>
+    </div>
+    <div class="feed-table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Time (UTC)</th>
+            <th>Source</th>
+            <th>Source Endpoint</th>
+            <th>Destination Endpoint</th>
+            <th>Disposition / Status</th>
+            <th>Forensic UUID</th>
+          </tr>
+        </thead>
+        <tbody id="eventsTbody">
+          <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">Waiting for telemetry stream... Run <code>python tools/generate_sample_logs.py --scenario demo</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Pure Vanilla JS Canvas Renderers (Zero external dependencies, 100% offline & air-gap ready)
+    const epsHistory = new Array(30).fill(0);
+    const epsCanvas = document.getElementById("epsCanvas");
+    const healthCanvas = document.getElementById("healthCanvas");
+    const sourceCanvas = document.getElementById("sourceCanvas");
+
+    function resizeCanvas(c) {
+      const rect = c.parentElement.getBoundingClientRect();
+      c.width = rect.width;
+      c.height = rect.height;
+    }
+
+    // 1. Draw EPS Timeline Chart
+    function drawEpsChart(eps) {
+      epsHistory.push(eps);
+      if (epsHistory.length > 30) epsHistory.shift();
+
+      resizeCanvas(epsCanvas);
+      const ctx = epsCanvas.getContext("2d");
+      const w = epsCanvas.width, h = epsCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const maxVal = Math.max(...epsHistory, 10);
+      const stepX = w / (epsHistory.length - 1);
+
+      // Grid lines
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let y = 0; y < h; y += h / 3) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+
+      // Area fill
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, "rgba(6, 182, 212, 0.35)");
+      grad.addColorStop(1, "rgba(6, 182, 212, 0.0)");
+
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      epsHistory.forEach((v, i) => {
+        const x = i * stepX;
+        const y = h - (v / maxVal) * (h - 20) - 10;
+        ctx.lineTo(x, y);
+      });
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Stroke Line
+      ctx.beginPath();
+      epsHistory.forEach((v, i) => {
+        const x = i * stepX;
+        const y = h - (v / maxVal) * (h - 20) - 10;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = "#06b6d4";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    // 2. Draw Donut Chart
+    function drawHealthChart(parsed, dlq) {
+      resizeCanvas(healthCanvas);
+      const ctx = healthCanvas.getContext("2d");
+      const w = healthCanvas.width, h = healthCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const total = parsed + dlq;
+      const parsedAngle = total > 0 ? (parsed / total) * Math.PI * 2 : Math.PI * 2;
+      const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2.6, innerR = r * 0.65;
+
+      // Parsed (Green)
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, parsedAngle);
+      ctx.arc(cx, cy, innerR, parsedAngle, 0, true);
+      ctx.closePath();
+      ctx.fillStyle = "#10b981";
+      ctx.fill();
+
+      // DLQ (Red)
+      if (total > 0 && dlq > 0) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, parsedAngle, Math.PI * 2);
+        ctx.arc(cx, cy, innerR, Math.PI * 2, parsedAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = "#ef4444";
+        ctx.fill();
+      }
+
+      // Center text
+      ctx.fillStyle = "#f3f4f6";
+      ctx.font = "bold 16px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const pct = total > 0 ? ((parsed / total) * 100).toFixed(0) : "100";
+      ctx.fillText(pct + "%", cx, cy);
+    }
+
+    // 3. Draw Source Distribution Bar Chart
+    function drawSourceChart(perSource) {
+      resizeCanvas(sourceCanvas);
+      const ctx = sourceCanvas.getContext("2d");
+      const w = sourceCanvas.width, h = sourceCanvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const sources = Object.keys(perSource);
+      if (sources.length === 0) return;
+
+      const counts = sources.map(s => (perSource[s].parsed || 0) + (perSource[s].dlq || 0));
+      const maxCount = Math.max(...counts, 1);
+      const barH = 18;
+      const gap = 16;
+      let startY = 18;
+
+      sources.forEach((s, i) => {
+        const val = counts[i];
+        const barW = Math.max((val / maxCount) * (w - 90), 4);
+
+        // Label
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(s, 10, startY + 12);
+
+        // Bar background
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        ctx.fillRect(80, startY, w - 120, barH);
+
+        // Bar Fill
+        ctx.fillStyle = s === "pfsense" ? "#3b82f6" : s === "suricata" ? "#f59e0b" : "#10b981";
+        ctx.fillRect(80, startY, barW, barH);
+
+        // Value
+        ctx.fillStyle = "#f3f4f6";
+        ctx.fillText(val, 85 + barW, startY + 13);
+
+        startY += barH + gap;
+      });
+    }
+
+    // Fetch and update dashboard metrics
+    async function updateDashboard() {
+      try {
+        const [mRes, eRes] = await Promise.all([
+          fetch("/metrics").then(r => r.json()),
+          fetch("/events/stream?n=12").then(r => r.json())
+        ]);
+
+        // Update Stat Cards
+        document.getElementById("valIngested").textContent = (mRes.total_ingested || 0).toLocaleString();
+        document.getElementById("valParsed").textContent = (mRes.total_parsed || 0).toLocaleString();
+        document.getElementById("valDlq").textContent = (mRes.total_dlq || 0).toLocaleString();
+        document.getElementById("valEps").textContent = (mRes.events_per_second || 0).toFixed(1);
+        document.getElementById("valBacklog").textContent = (mRes.buffer_backlog || 0).toLocaleString();
+
+        if (mRes.parse_success_rate_pct !== null && mRes.parse_success_rate_pct !== undefined) {
+          document.getElementById("subParseRate").textContent = `Rate: ${mRes.parse_success_rate_pct}%`;
+        }
+
+        // Update Badges
+        const bufferBadge = document.getElementById("bufferBadge");
+        bufferBadge.textContent = mRes.buffer_mode === "redis" ? "Buffer: Redis Streams" : "Buffer: Direct";
+        bufferBadge.className = mRes.buffer_mode === "redis" ? "badge badge-redis" : "badge";
+
+        const storageBadge = document.getElementById("storageBadge");
+        storageBadge.textContent = mRes.raw_store_mode === "minio" ? "Storage: MinIO S3" : "Storage: Local Disk";
+        storageBadge.className = mRes.raw_store_mode === "minio" ? "badge badge-minio" : "badge";
+
+        // Render Charts
+        drawEpsChart(mRes.events_per_second || 0);
+        drawHealthChart(mRes.total_parsed || 0, mRes.total_dlq || 0);
+        drawSourceChart(mRes.per_source || {});
+
+        // Update Event Table
+        if (Array.isArray(eRes) && eRes.length > 0) {
+          const tbody = document.getElementById("eventsTbody");
+          tbody.innerHTML = eRes.map(e => {
+            const vendor = (e.metadata && e.metadata.product && e.metadata.product.vendor_name) || "unknown";
+            const pillClass = vendor === "pfsense" ? "pill pill-pfsense" : vendor === "suricata" ? "pill pill-suricata" : vendor === "squid" ? "pill pill-squid" : "pill pill-other";
+            const srcIp = (e.src_endpoint && e.src_endpoint.ip) || "-";
+            const dstIp = (e.dst_endpoint && e.dst_endpoint.ip) || (e.http && e.http.url) || "-";
+            const disp = e.disposition || (e.http && e.http.cache_status) || (e.alert && e.alert.signature) || "Parsed";
+            const dispClass = disp === "Blocked" ? "disp-block" : disp === "Allowed" ? "disp-pass" : "";
+            const uid = (e.metadata && e.metadata.uid) || "";
+            const shortUid = uid ? uid.substring(0, 8) + "..." : "-";
+            const timeStr = e.time ? e.time.split("T")[1]?.replace("+00:00", "") || e.time : "-";
+
+            return `<tr>
+              <td>${timeStr}</td>
+              <td><span class="${pillClass}">${vendor}</span></td>
+              <td>${srcIp}</td>
+              <td>${dstIp}</td>
+              <td class="${dispClass}">${disp}</td>
+              <td class="uid-tag" title="${uid}">${shortUid}</td>
+            </tr>`;
+          }).join("");
+        }
+
+      } catch (err) {
+        console.error("Error polling metrics:", err);
+      }
+    }
+
+    // Poll every 1200ms
+    setInterval(updateDashboard, 1200);
+    window.addEventListener("resize", () => updateDashboard());
+    updateDashboard();
+  </script>
+</body>
+</html>
