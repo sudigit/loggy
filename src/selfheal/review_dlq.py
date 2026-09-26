@@ -1,131 +1,43 @@
 """
-Run this as a periodic/manual batch job (cron, or just by hand for the demo):
+One-shot self-heal pass from the command line (the running server does this
+continuously in the background -- see src/selfheal/dlq_processor.py).
 
-    python -m src.selfheal.review_dlq
+    python -m src.selfheal.review_dlq            # propose for clusters that meet the thresholds
+    python -m src.selfheal.review_dlq --all      # propose for every pending cluster now
 
-It NEVER runs per-event and NEVER auto-promotes anything. For each channel
-with enough dead-lettered events, it:
-  1. Tries a local Ollama call to propose a parser skeleton (fully offline --
-     if Ollama isn't running, this step is skipped, not blocked on).
-  2. Falls back to a simple heuristic skeleton generator so the demo still
-     shows the mechanism without requiring a GPU/Ollama install.
-  3. Writes the proposal to src/parser/configs/proposed/ for a HUMAN to
-     review and promote with src/selfheal/promote.py -- never live traffic.
+It NEVER promotes anything. Review proposals in the console (/selfheal) or
+promote from the CLI with:  python -m src.selfheal.promote <proposal_id>
 """
-import re
-from typing import Optional
+import argparse
 
-import requests
-import yaml
-
-from src import config
 from src.dlq import store as dlq_store
+from src.selfheal.dlq_processor import get_processor
 
 
-PROMPT_TEMPLATE = """You are helping onboard a new log source into a security log \
-normalization pipeline. Below are {n} raw log samples that failed to parse on \
-channel "{channel}". Propose a YAML parser config with this exact shape:
-
-source_id: <short_name>
-version: v1
-channel: "{channel}"
-fingerprint:
-  type: contains|regex|json_key
-  pattern_or_key: <value>
-tokenize:
-  type: regex|json|kv
-  pattern: <regex with named groups, if type=regex>
-mapping:
-  fields:
-    <source_field>: <ocsf.dotted.path>
-  values: {{}}
-  timestamp:
-    source: <field name or ingest_time>
-    format: epoch|iso8601
-
-Return ONLY the YAML, no prose.
-
-Samples:
-{samples}
-"""
-
-
-def _call_ollama(channel: str, samples: list) -> Optional[str]:
-    prompt = PROMPT_TEMPLATE.format(n=len(samples), channel=channel, samples="\n".join(samples[:5]))
-    try:
-        resp = requests.post(
-            f"{config.OLLAMA_URL}/api/generate",
-            json={"model": config.OLLAMA_MODEL, "prompt": prompt, "stream": False},
-            timeout=5,
-        )
-        resp.raise_for_status()
-        return resp.json().get("response")
-    except requests.exceptions.RequestException:
-        return None  # air-gapped / Ollama not running -- fall back below, never crash
-
-
-def _heuristic_skeleton(channel: str, samples: list) -> str:
-    """No-LLM fallback: sniff whether samples look like JSON or key=value
-    text and emit a starting-point config a human can refine. This keeps
-    the self-heal *mechanism* demoable even with no local model installed."""
-    sample = samples[0].strip()
-    safe_name = re.sub(r"\W+", "_", channel).strip("_") or "unknown_source"
-
-    if sample.startswith("{"):
-        return yaml.dump({
-            "source_id": safe_name,
-            "version": "v1_proposed",
-            "channel": channel,
-            "fingerprint": {"type": "contains", "pattern": "REVIEW_REQUIRED"},
-            "tokenize": {"type": "json"},
-            "mapping": {"fields": {"REVIEW_REQUIRED_map_fields": "REVIEW_REQUIRED"},
-                        "values": {}, "timestamp": {"source": "ingest_time"}},
-            "_note": "Auto-generated skeleton (Ollama unreachable) - looks like JSON. "
-                     "Human must fill in fingerprint + field mapping.",
-        }, sort_keys=False)
-
-    kv_pairs = re.findall(r"(\w+)=(\S+)", sample)
-    fields = {k: f"REVIEW_REQUIRED.{k}" for k, _ in kv_pairs} if kv_pairs else {"REVIEW_REQUIRED": "REVIEW_REQUIRED"}
-    return yaml.dump({
-        "source_id": safe_name,
-        "version": "v1_proposed",
-        "channel": channel,
-        "fingerprint": {"type": "contains", "pattern": "REVIEW_REQUIRED"},
-        "tokenize": {"type": "kv", "pair_sep": " ", "kv_sep": "="},
-        "mapping": {"fields": fields, "values": {}, "timestamp": {"source": "ingest_time"}},
-        "_note": "Auto-generated skeleton (Ollama unreachable) - looks like key=value text. "
-                 "Human must confirm fingerprint + refine mapping.",
-    }, sort_keys=False)
-
-
-def run():
-    grouped = dlq_store.pending_grouped_by_channel()
-    if not grouped:
+def run(force_all: bool = False):
+    clusters = dlq_store.pending_clusters()
+    if not clusters:
         print("No pending DLQ entries. Nothing to review.")
         return
-
-    for channel, entries in grouped.items():
-        if len(entries) < config.DLQ_BATCH_THRESHOLD:
-            print(f"[{channel}] only {len(entries)} pending (threshold={config.DLQ_BATCH_THRESHOLD}) - skipping for now")
-            continue
-
-        print(f"\n[{channel}] {len(entries)} pending failures -- generating proposal...")
-        samples = [e["raw_snippet"] for e in entries]
-
-        proposal_yaml = _call_ollama(channel, samples)
-        source_tag = "ollama"
-        if proposal_yaml is None:
-            proposal_yaml = _heuristic_skeleton(channel, samples)
-            source_tag = "heuristic-fallback"
-
-        safe_name = re.sub(r"\W+", "_", channel).strip("_") or "unknown"
-        out_path = config.PARSER_PROPOSED_DIR / f"{safe_name}_proposed.yaml"
-        out_path.write_text(proposal_yaml)
-
-        dlq_store.mark_status([e["id"] for e in entries], status="reviewed_pending_promotion")
-        print(f"[{channel}] proposal written to {out_path} (generated by: {source_tag})")
-        print("  -> Review it, then run: python -m src.selfheal.promote " + str(out_path))
+    proc = get_processor()
+    for c in clusters:
+        d = proc.evaluate(c)
+        print(f"[{c['cluster_id']}] {c['label']:<60} {c['count']:>5} pending  state={d['state']}")
+    created = proc.tick(force_cluster="*" if force_all else None)
+    for p in created:
+        v = p["validation"] or {}
+        print(f"\nProposal #{p['id']} for {p['cluster_label']}")
+        print(f"  file:       src/parser/configs/proposed/{p['filename']}")
+        print(f"  generator:  {p['generator']}")
+        print(f"  validation: {v.get('parsed')}/{v.get('total')} samples, "
+              f"regression {'PASSED' if (v.get('regression') or {}).get('passed') else 'FAILED'}")
+        for r in (p["awareness"] or {}).get("recommendations", []):
+            print(f"  note:       {r}")
+    if not created:
+        print("\nNo cluster met the thresholds yet (use --all to force).")
 
 
 if __name__ == "__main__":
-    run()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--all", action="store_true", help="ignore thresholds and propose for every cluster")
+    run(ap.parse_args().all)

@@ -1,0 +1,49 @@
+# Source: ANY device emitting IBM QRadar Log Event Extended Format (LEEF 1.0 / 2.0)
+# Juniper, Imperva, Palo Alto, Zscaler, Symantec, ... can all export LEEF.
+#   <13>Sep 16 10:22:01 srx01 LEEF:2.0|Juniper|SRX|21.2|RT_FLOW_SESSION_DENY|^|src=10.1.2.3^dst=8.8.8.8^srcPort=51234^dstPort=53^proto=17^action=deny^sev=5^devTime=1758017521000
+source_id: generic_leef
+version: v1
+log_name: leef
+product: {name: LEEF, vendor_name: unknown}
+priority: 10
+
+fingerprint:
+  type: regex
+  pattern: 'LEEF:[12]\.0\|'
+
+tokenize:
+  type: leef
+
+ocsf:
+  class_uid: 4001          # Network Activity
+  activity: Traffic
+
+mapping:
+  fields:
+    device_vendor: metadata.product.vendor_name
+    device_product: metadata.product.name
+    device_version: metadata.product.version
+    event_id: metadata.event_code
+    src: src_endpoint.ip
+    srcPort: src_endpoint.port
+    dst: dst_endpoint.ip
+    dstPort: dst_endpoint.port
+    proto: connection_info.protocol_name
+    usrName: actor.user.name
+    action: disposition
+    sev: severity_id
+    identHostName: device.hostname
+    srcBytes: traffic.bytes_out
+    dstBytes: traffic.bytes_in
+  values:
+    sev: {1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5, 10: 5}
+    action: {accept: Allowed, allow: Allowed, permit: Allowed, deny: Blocked, drop: Dropped, block: Blocked, reject: Blocked}
+  types:
+    traffic.bytes_in: int
+    traffic.bytes_out: int
+  lookups:
+    - {from: action, to: activity_name, map: {deny: Refuse, drop: Refuse, block: Refuse, reject: Refuse}, default: Traffic}
+  timestamp:
+    source: devTime
+    format: [epoch_ms, "%b %d %Y %H:%M:%S", iso8601]
+    fallback: envelope

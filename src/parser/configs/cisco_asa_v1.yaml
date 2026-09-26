@@ -1,0 +1,56 @@
+# Source: Cisco ASA / Firepower Threat Defense (LINA) firewall syslog
+#   <166>Sep 16 2026 10:22:01 asa-fw : %ASA-4-106023: Deny tcp src outside:203.0.113.19/51820 dst inside:10.1.2.15/443 by access-group "outside_access_in" [0x0, 0x0]
+#   %ASA-6-302013: Built inbound TCP connection 1234 for outside:198.51.100.23/51820 (198.51.100.23/51820) to inside:10.1.2.15/443 (10.1.2.15/443)
+# One config, several message IDs: each `patterns:` entry tags the OCSF activity it represents.
+source_id: cisco_asa
+version: v1
+log_name: asa-syslog
+product: {name: ASA, vendor_name: Cisco}
+channels: ["udp:5514"]
+priority: 60
+
+fingerprint:
+  type: regex
+  pattern: '%(?:ASA|FTD)-\d-\d{6}'
+
+tokenize:
+  type: regex
+  patterns:
+    - pattern: '%(?:ASA|FTD)-(?P<level>\d)-(?P<msg_id>106023): (?P<action>Deny) (?P<proto>\w+) src (?P<src_zone>[^:]+):(?P<src>[^/\s]+)/(?P<sport>\d+) dst (?P<dst_zone>[^:]+):(?P<dst>[^/\s]+)/(?P<dport>\d+) by access-group ["'']?(?P<acl>[^"''\s]+)'
+      static: {activity_name: Refuse}
+    - pattern: '%(?:ASA|FTD)-(?P<level>\d)-(?P<msg_id>106100): access-list (?P<acl>\S+) (?P<action>permitted|denied) (?P<proto>\w+) (?P<src_zone>[^/]+)/(?P<src>[^(\s]+)\((?P<sport>\d+)\)(?:\([^)]*\))? -> (?P<dst_zone>[^/]+)/(?P<dst>[^(\s]+)\((?P<dport>\d+)\)'
+    - pattern: '%(?:ASA|FTD)-(?P<level>\d)-(?P<msg_id>30201[35]): (?P<action>Built) (?P<dir>inbound|outbound) (?P<proto>\w+) connection (?P<conn_id>\d+) for (?P<src_zone>[^:]+):(?P<src>[^/\s]+)/(?P<sport>\d+)(?: \([^)]*\))? to (?P<dst_zone>[^:]+):(?P<dst>[^/\s]+)/(?P<dport>\d+)'
+      static: {activity_name: Open}
+    - pattern: '%(?:ASA|FTD)-(?P<level>\d)-(?P<msg_id>30201[46]): (?P<action>Teardown) (?P<proto>\w+) connection (?P<conn_id>\d+) for (?P<src_zone>[^:]+):(?P<src>[^/\s]+)/(?P<sport>\d+) to (?P<dst_zone>[^:]+):(?P<dst>[^/\s]+)/(?P<dport>\d+)(?: duration (?P<duration>\S+) bytes (?P<bytes>\d+))?'
+      static: {activity_name: Close}
+    - pattern: '%(?:ASA|FTD)-(?P<level>\d)-(?P<msg_id>710003): (?P<proto>\w+) access (?P<action>denied) by ACL from (?P<src>[^/\s]+)/(?P<sport>\d+) to (?P<dst_zone>[^:]+):(?P<dst>[^/\s]+)/(?P<dport>\d+)'
+      static: {activity_name: Refuse}
+    - pattern: '%(?:ASA|FTD)-(?P<level>\d)-(?P<msg_id>313001): (?P<action>Denied) (?P<proto>ICMP) type=(?P<icmp_type>\d+), code=(?P<icmp_code>\d+) from (?P<src>\S+) on interface (?P<src_zone>\S+)'
+      static: {activity_name: Refuse}
+
+ocsf:
+  class_uid: 4001          # Network Activity
+  activity: Traffic
+
+mapping:
+  fields:
+    src: src_endpoint.ip
+    sport: src_endpoint.port
+    dst: dst_endpoint.ip
+    dport: dst_endpoint.port
+    src_zone: src_endpoint.interface_name
+    dst_zone: dst_endpoint.interface_name
+    proto: connection_info.protocol_name
+    conn_id: connection_info.uid
+    acl: firewall_rule.name
+    bytes: traffic.bytes
+    level: severity_id
+  values:
+    # ASA syslog level (0 emergency .. 7 debug) -> OCSF severity_id
+    level: {0: 6, 1: 5, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1, 7: 1}
+  types:
+    traffic.bytes: int
+  lookups:
+    - {from: action, to: disposition, map: {deny: Blocked, denied: Blocked, permitted: Allowed, built: Allowed, teardown: Allowed}, default: Unknown}
+  timestamp:
+    source: envelope

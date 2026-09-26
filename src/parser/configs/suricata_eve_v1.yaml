@@ -1,0 +1,37 @@
+# Source: Suricata EVE JSON -- non-alert records (flow, netflow, dns, http, tls, ...) -> Network Activity
+source_id: suricata_eve
+version: v1
+log_name: eve.json
+product: {name: Suricata, vendor_name: OISF}
+channels: ["http"]
+priority: 65
+
+fingerprint:
+  type: all
+  rules:
+    - {type: json_key, key: event_type}
+    - {type: json_key, key: src_ip}
+
+tokenize:
+  type: json
+
+ocsf:
+  class_uid: 4001          # Network Activity
+  activity: Traffic
+  severity_id: 1
+
+mapping:
+  fields:
+    src_ip: src_endpoint.ip
+    src_port: src_endpoint.port
+    dest_ip: dst_endpoint.ip
+    dest_port: dst_endpoint.port
+    proto: connection_info.protocol_name
+    app_proto: app_name
+    flow.bytes_toserver: traffic.bytes_out
+    flow.bytes_toclient: traffic.bytes_in
+  lookups:
+    - {from: event_type, to: activity_name, map: {flow: Close, netflow: Traffic}, default: Traffic}
+  timestamp:
+    source: timestamp
+    format: iso8601

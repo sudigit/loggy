@@ -1,0 +1,2 @@
+<189>date=2026-09-16 time=10:22:01 devname="FGT60D" devid="FGT60D4613000000" logid="0000000013" type="traffic" subtype="forward" level="notice" vd="root" srcip=10.1.2.3 srcport=51820 srcintf="port1" dstip=8.8.8.8 dstport=443 dstintf="wan1" proto=6 action="accept" policyid=1 service="HTTPS" sentbyte=1234 rcvdbyte=5678
+date=2026-09-16 time=10:22:02 devname="FGT60D" devid="FGT60D4613000000" type="traffic" subtype="forward" level="warning" srcip=185.220.101.5 srcport=4444 srcintf="wan1" dstip=10.1.2.15 dstport=3389 dstintf="port1" proto=6 action="deny" policyid=0 service="RDP"

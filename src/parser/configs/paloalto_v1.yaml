@@ -1,0 +1,64 @@
+# Source: Palo Alto Networks PAN-OS TRAFFIC log (syslog, CSV payload)
+#   <14>Sep 16 10:22:01 PA-VM 1,2026/09/16 10:22:01,012801000001,TRAFFIC,end,2561,2026/09/16 10:22:01,10.1.2.15,8.8.8.8,
+#   203.0.113.5,8.8.8.8,allow-dns,,,dns,vsys1,trust,untrust,ethernet1/2,ethernet1/1,default,,4567,1,53211,53,31234,53,0x19,
+#   udp,allow,210,90,120,2,2026/09/16 10:21:59,0,any,,7101,0x0,10.0.0.0-10.255.255.255,United States,,1,1,aged-out
+# Columns are positional (PAN-OS 10.x field order); `_` = column not needed.
+source_id: paloalto
+version: v1
+log_name: traffic
+product: {name: PAN-OS, vendor_name: Palo Alto Networks}
+channels: ["udp:5514"]
+priority: 60
+
+fingerprint:
+  type: regex
+  pattern: ',\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2},[^,]*,TRAFFIC,'
+
+tokenize:
+  type: csv
+  delimiter: ","
+  min_columns: 31
+  fields: [_, receive_time, serial, type, subtype, _, generated_time, src, dst, nat_src, nat_dst,
+           rule, src_user, dst_user, app, vsys, src_zone, dst_zone, in_iface, out_iface, log_action,
+           _, session_id, repeat_count, sport, dport, nat_sport, nat_dport, flags, proto, action,
+           bytes, bytes_sent, bytes_received, packets, start_time, elapsed, category, _, seqno,
+           action_flags, src_location, dst_location, _, packets_sent, packets_received, session_end_reason]
+
+ocsf:
+  class_uid: 4001          # Network Activity
+  activity: Traffic
+  severity_id: 1
+
+mapping:
+  fields:
+    src: src_endpoint.ip
+    sport: src_endpoint.port
+    dst: dst_endpoint.ip
+    dport: dst_endpoint.port
+    src_zone: src_endpoint.zone
+    dst_zone: dst_endpoint.zone
+    in_iface: src_endpoint.interface_name
+    out_iface: dst_endpoint.interface_name
+    proto: connection_info.protocol_name
+    session_id: connection_info.uid
+    action: disposition
+    rule: firewall_rule.name
+    app: app_name
+    src_user: actor.user.name
+    bytes_sent: traffic.bytes_out
+    bytes_received: traffic.bytes_in
+    packets: traffic.packets
+    serial: device.uid
+  values:
+    action: {allow: Allowed, deny: Blocked, drop: Dropped, drop-icmp: Dropped, reset-client: Blocked, reset-server: Blocked, reset-both: Blocked}
+  types:
+    traffic.bytes_out: int
+    traffic.bytes_in: int
+    traffic.packets: int
+  lookups:
+    - {from: subtype, to: activity_name, map: {start: Open, end: Close, drop: Refuse, deny: Refuse}, default: Traffic}
+  timestamp:
+    source: generated_time
+    format: "%Y/%m/%d %H:%M:%S"
+    timezone: UTC
+    fallback: envelope

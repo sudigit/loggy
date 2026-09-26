@@ -1,0 +1,14 @@
+# Regression corpus: every line of each file must be claimed by `source_id`
+# (and produce `class_uid`) with the CURRENT + CANDIDATE parser set.
+# source_id: null means the line must NOT parse (known garbage stays in the DLQ).
+pfsense.log:          {source_id: pfsense, channel: "udp:5514", class_uid: 4001}
+squid.log:            {source_id: squid, channel: "file:squid", class_uid: 4002}
+suricata.log:         {source_id: suricata, channel: http, class_uid: 2004}
+suricata_eve.log:     {source_id: suricata_eve, channel: http, class_uid: 4001}
+cisco_asa.log:        {source_id: cisco_asa, channel: "udp:5514", class_uid: 4001}
+fortigate.log:        {source_id: fortigate, channel: "udp:5514", class_uid: 4001}
+paloalto.log:         {source_id: paloalto, channel: "udp:5514", class_uid: 4001}
+generic_cef.log:      {source_id: generic_cef, channel: "udp:5514", class_uid: 4001}
+generic_cef_base.log: {source_id: generic_cef_base, channel: "udp:5514", class_uid: 0}
+generic_leef.log:     {source_id: generic_leef, channel: "udp:5514", class_uid: 4001}
+garbage.log:          {source_id: null, channel: "udp:5514"}

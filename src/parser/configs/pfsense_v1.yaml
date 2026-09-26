@@ -1,31 +1,50 @@
-# Source: pfSense firewall filterlog (syslog, space-delimited key=value)
-# Sample raw line:
+# Source: pfSense / OPNsense firewall "filterlog" (syslog)
+# Supports both the real CSV filterlog format and the simplified key=value demo format:
+#   <134>Sep 16 10:22:01 pfsense filterlog[1234]: 5,,,1000000103,igb1,match,block,in,4,0x0,,64,0,0,DF,6,tcp,60,10.1.2.3,192.168.1.5,51234,443,0,S,1,,64240,,mss
 #   Sep 16 10:22:01 pfsense filterlog: rule 12 block in on em0 src=10.1.2.3 dst=192.168.1.5 proto=tcp
+# The syslog header is handled by the generic envelope layer -- this file only describes the payload.
 source_id: pfsense
-version: v1
-channel: udp:5514
+version: v2
+log_name: filterlog
+product: {name: pfSense, vendor_name: Netgate}
+channels: ["udp:5514"]
+priority: 60
 
 fingerprint:
   type: contains
-  pattern: "filterlog:"
+  pattern: "filterlog"
 
 tokenize:
   type: regex
-  pattern: 'rule (?P<rule>\d+) (?P<disposition>\w+) in on (?P<iface>\S+) src=(?P<src>\S+) dst=(?P<dst>\S+) proto=(?P<proto>\w+)'
+  patterns:
+    # real pfSense CSV (IPv4): rule,subrule,anchor,tracker,iface,reason,action,dir,4,tos,ecn,ttl,id,offset,flags,proto_id,proto,length,src,dst[,sport,dport]
+    - '^(?P<rule>\d*),[^,]*,[^,]*,(?P<tracker>\d*),(?P<iface>[^,]+),(?P<reason>[^,]*),(?P<disposition>\w+),(?P<dir>in|out),4,(?:[^,]*,){6}(?P<proto_num>\d+),(?P<proto>\w+),(?P<length>\d+),(?P<src>[\d.]+),(?P<dst>[\d.]+)(?:,(?P<sport>\d+),(?P<dport>\d+))?'
+    # simplified demo format
+    - 'rule (?P<rule>\d+) (?P<disposition>\w+) (?P<dir>in|out) on (?P<iface>\S+) src=(?P<src>\S+) dst=(?P<dst>\S+) proto=(?P<proto>\w+)(?: sport=(?P<sport>\d+))?(?: dport=(?P<dport>\d+))?'
+
+ocsf:
+  class_uid: 4001          # Network Activity
+  activity: Traffic
+  severity_id: 1
 
 mapping:
   fields:
     src: src_endpoint.ip
+    sport: src_endpoint.port
     dst: dst_endpoint.ip
+    dport: dst_endpoint.port
     proto: connection_info.protocol_name
-    iface: connection_info.interface
+    proto_num: connection_info.protocol_num
+    iface: src_endpoint.interface_name
     disposition: disposition
-    rule: metadata.rule_id
+    rule: firewall_rule.uid
+    tracker: firewall_rule.name
   values:
-    disposition:
-      block: "Blocked"
-      pass: "Allowed"
+    disposition: {block: Blocked, pass: Allowed, reject: Blocked}
+  lookups:
+    - {from: disposition, to: activity_name, map: {block: Refuse, reject: Refuse, pass: Traffic}, default: Traffic}
+    - {from: disposition, to: severity_id, map: {block: 2, reject: 2}, default: 1}
   timestamp:
-    # classic BSD syslog has no year/timezone in the line itself -- rather
-    # than guess, fall back to the framework's ingest wall-clock (see engine.py)
-    source: ingest_time
+    # BSD syslog header carries no year/timezone; the envelope layer infers
+    # the year and treats it as UTC. Original string kept in metadata.original_time.
+    source: envelope

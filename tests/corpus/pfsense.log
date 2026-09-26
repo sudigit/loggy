@@ -1,0 +1,4 @@
+Sep 16 10:22:01 pfsense filterlog: rule 12 block in on em0 src=10.1.2.3 dst=192.168.1.5 proto=tcp
+Sep 16 10:22:02 pfsense filterlog: rule 31 pass in on em0 src=10.1.2.45 dst=8.8.8.8 proto=udp
+<134>Sep 16 10:22:01 pfsense filterlog[1234]: 5,,,1000000103,igb1,match,block,in,4,0x0,,64,0,0,DF,6,tcp,60,203.0.113.9,192.168.1.5,51234,443,0,S,1,,64240,,mss
+<134>Sep 16 10:22:03 fw01 filterlog[88]: 77,,,1000000177,igb0,match,pass,out,4,0x0,,64,51234,0,none,17,udp,76,10.1.2.15,1.1.1.1,53001,53,56

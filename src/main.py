@@ -1,61 +1,72 @@
 """
-ULPF prototype entrypoint.
+ULPF entrypoint.
 
 Starts:
-  - Durable Redis Stream buffer / worker pool (or direct fallback)
-  - ListenerManager - manages syslog, HTTP, and file watcher listeners based on EnvConfig
+  - durable Redis Streams buffer + worker pool (or direct in-process fallback)
+  - ingestion listeners (UDP/TCP syslog, HTTP API + console, file watcher) per .env
+  - the continuous DLQ self-heal watcher (proposals only -- promotion is human-gated)
 
 Run with:  python -m src.main
 """
-from src.config_env.env_config import EnvConfig
-from src.selfheal.listener_manager import ListenerManager
+import logging
+import time
+
+from src import config  # noqa: F401 - loads .env before anything reads the environment
 from src.buffer import redis_buffer
+from src.config_env.env_config import EnvConfig
+from src.pipeline import get_engine
+from src.selfheal.dlq_processor import get_processor
+from src.selfheal.listener_manager import ListenerManager
 
 
 def main():
-    print("=" * 60)
-    print("Universal Log Pre-processing Framework (ULPF)")
-    print("=" * 60)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
-    # Initialize durable streaming buffer
+    print("=" * 64)
+    print(" Universal Log Pre-processing Framework (ULPF)")
+    print("=" * 64)
+
+    engine = get_engine()
+    print(f"[parsers] {len(engine.configs)} parser configs loaded: "
+          + ", ".join(c["source_id"] for c in engine.configs))
+
     buffer_mode = redis_buffer.init_buffer()
     if buffer_mode == "redis":
-        from src import config
         print(f"[buffer] Redis Streams durable buffer active (stream={config.STREAM_NAME})")
         redis_buffer.start_workers(config.STREAM_WORKER_COUNT)
     else:
-        print("[buffer] Running in direct synchronous mode (Redis not connected)")
+        print("[buffer] direct synchronous mode (Redis not configured/reachable)")
 
-    # Load configuration from environment
-    config = EnvConfig.load_from_env()
-    
-    # Initialize and start all listeners based on configuration
-    listener_manager = ListenerManager(config)
+    from src.core import raw_store
+    print(f"[raw] raw archive backend: {raw_store.get_store_mode()}")
+    print(f"[sinks] {', '.join(config.SINKS)}")
+
+    env = EnvConfig.load_from_env()
+    listener_manager = ListenerManager(env)
     results = listener_manager.start_all()
-    
-    # Print listener status
-    print("\n[listeners] Status:")
+    print("\n[listeners]")
     for name, status in listener_manager.get_status().items():
-        enabled_str = "enabled" if status.enabled else "disabled"
-        running_str = "running" if status.running else "stopped"
-        port_info = f" port {status.port}" if status.port else ""
-        print(f"  - {name}: {enabled_str}, {running_str}{port_info}")
+        state = "running" if status.running else ("disabled" if not status.enabled else "FAILED")
+        extra = f" port {status.port}" if status.port else ""
+        print(f"  - {name}: {state}{extra}")
+    if not all(results.values()):
+        print("  (some listeners failed to start -- see log above)")
 
-    # Print success/failure of start_all
-    print("\n[listeners] Startup results:")
-    for name, success in results.items():
-        print(f"  - {name}: {'OK' if success else 'FAILED'}")
+    if config.SELFHEAL_ENABLED:
+        get_processor().start()
+        print(f"\n[self-heal] DLQ watcher running: tick {config.DLQ_TICK_SECONDS}s, "
+              f"min {config.DLQ_MIN_SAMPLES} samples, propose at {config.DLQ_COUNT_THRESHOLD} events "
+              f"or after {config.DLQ_TIME_THRESHOLD}s")
 
-    # Block on HTTP listener (it's the last one to run)
-    # The HTTP listener runs in a daemon thread, so this won't block naturally
-    # We use a simple sleep to keep the main process alive
-    import time
-    print("\n[main] All listeners started. Press Ctrl+C to stop.")
+    print(f"\n[console] http://localhost:{env.HTTP_PORT}/   (Ctrl+C to stop)")
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n[main] Shutting down...")
+        print("\n[main] shutting down...")
+        get_processor().stop()
+        redis_buffer.stop_workers()
         listener_manager.stop_all()
 
 

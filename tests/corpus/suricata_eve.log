@@ -1,0 +1,1 @@
+{"timestamp":"2026-09-16T10:22:05.000000+0000","flow_id":99,"event_type":"flow","src_ip":"10.1.2.15","src_port":53211,"dest_ip":"8.8.8.8","dest_port":53,"proto":"UDP","app_proto":"dns","flow":{"bytes_toserver":74,"bytes_toclient":90}}

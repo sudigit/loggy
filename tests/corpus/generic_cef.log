@@ -1,0 +1,2 @@
+<134>Sep 16 10:22:01 cp-mgmt CEF:0|Check Point|VPN-1 & FireWall-1|R81|Drop|Drop|5|src=203.0.113.19 spt=51820 dst=10.1.2.15 dpt=22 proto=TCP act=Drop rt=1758017521000
+CEF:0|Fortinet|FortiWeb|7.2|20000010|SQL Injection|8|src=198.51.100.23 dst=10.1.2.88 dpt=443 act=blocked request=http://shop.corp.local/login requestMethod=POST

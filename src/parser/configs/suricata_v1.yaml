@@ -1,25 +1,43 @@
-# Source: Suricata IDS EVE JSON alert log
-# Sample raw line:
-#   {"timestamp":"2026-09-16T10:22:03+00:00","src_ip":"10.1.2.3","dest_ip":"192.168.1.5",
-#    "proto":"TCP","event_type":"alert","alert":{"signature":"ET SCAN Nmap"}}
+# Source: Suricata IDS/IPS EVE JSON -- alert events -> OCSF Detection Finding
+#   {"timestamp":"2026-09-16T10:22:03.123456+0000","event_type":"alert","src_ip":"10.1.2.3","src_port":51234,
+#    "dest_ip":"192.168.1.5","dest_port":443,"proto":"TCP",
+#    "alert":{"action":"allowed","signature_id":2010935,"signature":"ET SCAN Nmap","category":"Attempted Information Leak","severity":2}}
+# Non-alert EVE records (flow, dns, http, tls ...) are handled by suricata_eve_v1.yaml.
 source_id: suricata
-version: v1
-channel: http
+version: v2
+log_name: eve.json
+product: {name: Suricata, vendor_name: OISF}
+channels: ["http"]
+priority: 70
 
 fingerprint:
   type: json_key
   key: event_type
+  value: alert
 
 tokenize:
   type: json
 
+ocsf:
+  class_uid: 2004          # Detection Finding
+  activity: Create
+
 mapping:
   fields:
     src_ip: src_endpoint.ip
+    src_port: src_endpoint.port
     dest_ip: dst_endpoint.ip
+    dest_port: dst_endpoint.port
     proto: connection_info.protocol_name
-    event_type: class_name
-  values: {}
+    in_iface: src_endpoint.interface_name
+    alert.signature: finding_info.title
+    alert.signature_id: finding_info.uid
+    alert.category: finding_info.desc
+    alert.severity: severity_id
+    alert.action: disposition
+  values:
+    alert.severity: {1: 4, 2: 3, 3: 2, 4: 1}
+    alert.action: {allowed: Detected, blocked: Blocked}
   timestamp:
     source: timestamp
     format: iso8601

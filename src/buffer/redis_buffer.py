@@ -18,13 +18,15 @@ logger = logging.getLogger("ulpf.buffer")
 
 _redis_client = None
 _buffer_mode = "direct"  # "redis" or "direct"
+_resolved = False        # connection is attempted ONCE -- a dead Redis is never retried per event
 _stop_workers = False
 
 
 def get_redis_client():
-    global _redis_client, _buffer_mode
-    if _redis_client is not None:
+    global _redis_client, _buffer_mode, _resolved
+    if _resolved:
         return _redis_client
+    _resolved = True
 
     if config.BUFFER_TYPE == "direct":
         _buffer_mode = "direct"
@@ -32,12 +34,13 @@ def get_redis_client():
 
     try:
         import redis
-        client = redis.Redis.from_url(config.REDIS_URL, decode_responses=False, socket_timeout=2.0)
+        client = redis.Redis.from_url(config.REDIS_URL, decode_responses=False,
+                                      socket_timeout=2.0, socket_connect_timeout=1.0)
         client.ping()
         _redis_client = client
         _buffer_mode = "redis"
         return _redis_client
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"[buffer] Redis unavailable ({e}). Falling back to direct in-process buffer.")
         _buffer_mode = "direct"
         return None
@@ -72,7 +75,7 @@ def get_buffer_mode() -> str:
 
 
 def push_to_stream(event_id: str, raw_bytes: bytes, channel: str,
-                   source_hint: Optional[str], ingest_time_iso: str) -> bool:
+                   source_hint: Optional[str], ingest_time_iso: str, raw_info: dict = None) -> bool:
     """Fast-path publish into Redis Stream."""
     client = get_redis_client()
     if client is None or _buffer_mode != "redis":
@@ -84,6 +87,8 @@ def push_to_stream(event_id: str, raw_bytes: bytes, channel: str,
         b"channel": channel.encode("utf-8"),
         b"source_hint": (source_hint or "").encode("utf-8"),
         b"ingest_time": ingest_time_iso.encode("utf-8"),
+        b"raw_ref": (raw_info or {}).get("raw_ref", "").encode("utf-8"),
+        b"raw_sha256": (raw_info or {}).get("sha256", "").encode("utf-8"),
     }
     try:
         client.xadd(config.STREAM_NAME, payload)
@@ -142,6 +147,11 @@ def _worker_loop(worker_name: str):
                         hint_raw = data.get(b"source_hint", b"").decode("utf-8")
                         source_hint = hint_raw if hint_raw else None
                         ingest_time_iso = data[b"ingest_time"].decode("utf-8")
+                        raw_info = {
+                            "raw_ref": data.get(b"raw_ref", b"").decode("utf-8") or None,
+                            "sha256": data.get(b"raw_sha256", b"").decode("utf-8") or None,
+                            "size_bytes": len(raw_bytes),
+                        }
 
                         # Execute core parser + schema mapping + output writer / dlq
                         execute_event_processing(
@@ -150,6 +160,7 @@ def _worker_loop(worker_name: str):
                             channel=channel,
                             source_hint=source_hint,
                             ingest_time_iso=ingest_time_iso,
+                            raw_info=raw_info,
                         )
 
                         # Acknowledge processed message

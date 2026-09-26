@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ULPF Console</title>
+<!-- Universal Log Pre-processing Framework — operator console. Self-contained: no CDN, no web fonts (air-gap safe). -->
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #f0f2f5; --border: #e2e5ea; --border-strong: #cfd4dc;
+  --text: #14171c; --muted: #5d6572; --faint: #8a93a0;
+  --accent: #2459d6; --accent-soft: #e6edfc;
+  --ok: #15803d; --ok-soft: #e3f4e8; --warn: #a15c07; --warn-soft: #fcf1de;
+  --bad: #b42318; --bad-soft: #fde8e6; --violet: #6b3fd4; --violet-soft: #efe9fc;
+  --code-bg: #f6f7f9;
+  --shadow: 0 1px 2px rgba(16,24,40,.05);
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1015; --surface: #141920; --surface-2: #1a2029; --border: #252d38; --border-strong: #323c49;
+    --text: #e5e8ed; --muted: #97a0ad; --faint: #6b7583;
+    --accent: #6ea0ff; --accent-soft: #1b2a47;
+    --ok: #46c07a; --ok-soft: #14301f; --warn: #e3a33f; --warn-soft: #34270f;
+    --bad: #f2736b; --bad-soft: #3a1817; --violet: #a88bff; --violet-soft: #271e45;
+    --code-bg: #10141a; --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1015; --surface: #141920; --surface-2: #1a2029; --border: #252d38; --border-strong: #323c49;
+  --text: #e5e8ed; --muted: #97a0ad; --faint: #6b7583;
+  --accent: #6ea0ff; --accent-soft: #1b2a47;
+  --ok: #46c07a; --ok-soft: #14301f; --warn: #e3a33f; --warn-soft: #34270f;
+  --bad: #f2736b; --bad-soft: #3a1817; --violet: #a88bff; --violet-soft: #271e45;
+  --code-bg: #10141a; --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+
+/* ---------- shell ---------- */
+.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.side { background: var(--surface); border-right: 1px solid var(--border); padding: 18px 14px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--text); color: var(--bg); display: grid; place-items: center; font: 700 12px var(--mono); letter-spacing: -.5px; }
+.brand b { display: block; font-size: 14px; }
+.brand span { display: block; font-size: 11px; color: var(--muted); }
+nav { display: flex; flex-direction: column; gap: 2px; }
+nav a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 7px; color: var(--muted); text-decoration: none; font-weight: 500; }
+nav a:hover { background: var(--surface-2); color: var(--text); }
+nav a.active { background: var(--accent-soft); color: var(--accent); }
+nav .count { font: 600 11px var(--mono); padding: 1px 7px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); }
+nav .count:empty { display: none; }
+.side-foot { margin-top: auto; display: grid; gap: 6px; font-size: 12px; color: var(--muted); padding: 0 6px; }
+.side-foot div { display: flex; justify-content: space-between; gap: 8px; }
+.side-foot b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: 11.5px; }
+.theme-btn { border: 1px solid var(--border); background: transparent; border-radius: 7px; padding: 5px 8px; cursor: pointer; font-size: 12px; color: var(--muted); }
+main { padding: 22px 28px 40px; min-width: 0; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.page-head h1 { font-size: 20px; margin: 0; letter-spacing: -.2px; }
+.page-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.view { display: none; }
+.view.active { display: block; }
+
+/* ---------- primitives ---------- */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.card-h h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
+.card-h .sub { color: var(--muted); font-size: 12px; }
+.card-b { padding: 14px 16px; }
+.grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.kpi { padding: 12px 14px; }
+.kpi .label { font-size: 12px; color: var(--muted); }
+.kpi .value { font-size: 24px; font-weight: 600; letter-spacing: -.5px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi .hint { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+.kpi.alert .value { color: var(--bad); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.info { background: var(--accent-soft); color: var(--accent); }
+.pill.violet { background: var(--violet-soft); color: var(--violet); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+.dot.live { animation: pulse 1.6s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.btn { border: 1px solid var(--border-strong); background: var(--surface); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.good { background: var(--ok); border-color: var(--ok); color: #fff; }
+.btn.danger { color: var(--bad); }
+.btn.sm { padding: 3px 9px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.muted { color: var(--muted); }
+.faint { color: var(--faint); }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--surface-2); }
+tr.selected td { background: var(--accent-soft); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; min-width: 60px; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.bar.warn > i { background: var(--warn); } .bar.ok > i { background: var(--ok); }
+pre.code { margin: 0; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: 12px/1.55 var(--mono); overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: 420px; }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 12.5px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+input[type=text], input[type=number], select { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 7px; padding: 5px 9px; font-size: 13px; }
+input[type=number] { width: 78px; }
+textarea.yaml { width: 100%; min-height: 360px; resize: vertical; background: var(--code-bg); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px; font: 12px/1.55 var(--mono); tab-size: 2; }
+textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.toast { position: fixed; right: 20px; bottom: 20px; max-width: 520px; padding: 12px 14px; border-radius: 9px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 50; display: none; white-space: pre-wrap; }
+.toast.ok { background: var(--ok); color: #fff; } .toast.bad { background: var(--bad); color: #fff; }
+
+/* ---------- overview ---------- */
+.ov-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; }
+.chart { width: 100%; height: 170px; display: block; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.flow { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; padding: 4px 2px 6px; }
+.stage { flex: 1 0 104px; border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; background: var(--surface-2); }
+.stage .t { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.stage .v { font: 600 16px var(--mono); margin-top: 3px; }
+.stage .d { font-size: 11px; color: var(--faint); margin-top: 2px; }
+.arrow { align-self: center; color: var(--faint); font-size: 13px; }
+.stage.dlq { background: var(--bad-soft); border-color: transparent; }
+.stage.dlq .v { color: var(--bad); }
+.feed { max-height: 360px; overflow: auto; }
+.feed-row { display: grid; grid-template-columns: 64px 118px 1fr; gap: 10px; align-items: center; padding: 7px 16px; border-bottom: 1px solid var(--border); font-size: 12.5px; cursor: pointer; }
+.feed-row:hover { background: var(--surface-2); }
+.feed-row .src { font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- events ---------- */
+.ev-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; align-items: start; }
+.ev-list { max-height: calc(100vh - 170px); overflow: auto; }
+.inspector { position: sticky; top: 16px; }
+.trace { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
+.trace .step { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.trace .step .t { font-size: 11px; color: var(--muted); }
+.trace .step .v { font: 12px var(--mono); word-break: break-all; margin-top: 2px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.tabs button { border: 0; background: none; padding: 7px 10px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; font-size: 13px; }
+.tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+.j-key { color: var(--accent); } .j-str { color: var(--ok); } .j-num { color: var(--violet); } .j-lit { color: var(--warn); }
+
+/* ---------- self-heal ---------- */
+.sh-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; align-items: center; padding: 12px 16px; margin-bottom: 14px; }
+.sh-status { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+.sh-status .stat b { font: 600 15px var(--mono); display: block; }
+.sh-status .stat span { font-size: 11.5px; color: var(--muted); }
+.settings { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.settings label { display: flex; align-items: center; gap: 5px; }
+.sh-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 14px; align-items: start; }
+.cluster { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cluster:last-child { border-bottom: 0; }
+.cluster-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cluster-h .name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cluster-meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; font-size: 12px; color: var(--muted); }
+.progress-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; font-size: 11.5px; color: var(--muted); }
+.progress-row .bar { margin-top: 3px; }
+.sample { font: 11.5px/1.5 var(--mono); background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cluster-actions { display: flex; gap: 6px; margin-top: 8px; }
+.prop-list .prop { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.prop-list .prop:hover { background: var(--surface-2); }
+.prop-list .prop.selected { background: var(--accent-soft); }
+.prop .title { font-weight: 600; font-size: 13px; }
+.prop .meta { font-size: 12px; color: var(--muted); }
+.review-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+.checks { display: grid; gap: 6px; font-size: 12.5px; }
+.checks div { display: flex; gap: 8px; align-items: baseline; }
+.checks .ic { font-weight: 700; width: 14px; flex: 0 0 14px; }
+.ic.ok { color: var(--ok); } .ic.bad { color: var(--bad); } .ic.warn { color: var(--warn); } .ic.info { color: var(--accent); }
+.actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.activity { max-height: 300px; overflow: auto; font-size: 12.5px; }
+.activity div { padding: 7px 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 62px 1fr; gap: 8px; }
+.activity time { color: var(--faint); font: 11.5px var(--mono); }
+
+/* ---------- modal ---------- */
+.modal-bg { position: fixed; inset: 0; background: rgba(10,12,16,.45); display: none; align-items: center; justify-content: center; z-index: 40; padding: 20px; }
+.modal-bg.open { display: flex; }
+.modal { width: min(820px, 100%); max-height: 88vh; overflow: auto; }
+
+@media (max-width: 1180px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ov-grid, .ev-layout, .sh-layout, .review-grid { grid-template-columns: minmax(0, 1fr); }
+  .inspector { position: static; }
+}
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 10px 16px; gap: 10px; }
+  nav { flex-direction: row; overflow-x: auto; }
+  .side-foot { display: none; }
+  main { padding: 16px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-grid, .trace { grid-template-columns: 1fr; }
+  .feed-row { grid-template-columns: 56px 1fr; }
+  .feed-row .cls { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark">UL</div>
+      <div><b>ULPF</b><span>Universal Log Pre-processing</span></div>
+    </div>
+    <nav>
+      <a href="#overview" data-view="overview">Overview</a>
+      <a href="#events" data-view="events">Events &amp; trace</a>
+      <a href="#selfheal" data-view="selfheal">Self-heal <span class="count" id="nav-dlq"></span></a>
+      <a href="#parsers" data-view="parsers">Parsers</a>
+    </nav>
+    <div class="side-foot">
+      <div>Buffer <b id="f-buffer">–</b></div>
+      <div>Raw archive <b id="f-raw">–</b></div>
+      <div>Sinks <b id="f-sinks">–</b></div>
+      <div>Self-heal <b id="f-sh">–</b></div>
+      <div>Uptime <b id="f-uptime">–</b></div>
+      <button class="theme-btn" id="theme-btn" type="button">Toggle theme</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- =============================== OVERVIEW =============================== -->
+    <section class="view" id="view-overview">
+      <div class="page-head">
+        <div><h1>Pipeline overview</h1><p>Every event: raw archived and hashed, parsed, normalized to OCSF, validated, delivered — or quarantined, never dropped.</p></div>
+        <span class="pill ok" id="live-pill"><span class="dot live"></span>Live</span>
+      </div>
+      <div class="kpis">
+        <div class="card kpi"><div class="label">Events / sec</div><div class="value" id="k-eps">–</div><div class="hint" id="k-eps-avg">&nbsp;</div></div>
+        <div class="card kpi"><div class="label">Ingested</div><div class="value" id="k-ing">–</div><div class="hint">raw archived + SHA-256</div></div>
+        <div class="card kpi"><div class="label">Normalized</div><div class="value" id="k-rate">–</div><div class="hint" id="k-parsed">&nbsp;</div></div>
+        <div class="card kpi" id="k-dlq-card"><div class="label">DLQ pending</div><div class="value" id="k-dlq">–</div><div class="hint" id="k-dlq-hint">&nbsp;</div></div>
+        <div class="card kpi"><div class="label">Parsers live</div><div class="value" id="k-parsers">–</div><div class="hint">config-driven, hot-reload</div></div>
+        <div class="card kpi"><div class="label">Replayed from DLQ</div><div class="value" id="k-replayed">–</div><div class="hint">healed after promotion</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-h"><h2>Processing stages</h2><span class="sub">cumulative since start</span></div>
+        <div class="card-b"><div class="flow" id="flow"></div></div>
+      </div>
+
+      <div class="ov-grid">
+        <div class="grid">
+          <div class="card">
+            <div class="card-h"><h2>Throughput — last 2 minutes</h2>
+              <div class="legend"><span><i style="background:var(--accent)"></i>Normalized</span><span><i style="background:var(--bad)"></i>DLQ</span></div>
+            </div>
+            <div class="card-b"><svg class="chart" id="chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" aria-label="Events per second over the last two minutes"></svg></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Sources</h2><span class="sub">one schema, many vendors</span></div>
+            <div style="overflow-x:auto"><table>
+              <thead><tr><th>Source</th><th>Product</th><th class="num">Normalized</th><th class="num">DLQ</th><th>Share</th><th>Last seen</th></tr></thead>
+              <tbody id="sources"></tbody>
+            </table></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h2>Live normalized feed</h2><span class="sub">click to trace</span></div>
+          <div class="feed" id="feed"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================== EVENTS =============================== -->
+    <section class="view" id="view-events">
+      <div class="page-head">
+        <div><h1>Events &amp; traceability</h1><p>Normalized record ↔ untouched original, linked by UUID and verified by SHA-256.</p></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="ev-source"><option value="">All sources</option></select>
+          <select id="ev-class"><option value="">All classes</option><option value="4001">Network Activity</option><option value="4002">HTTP Activity</option><option value="2004">Detection Finding</option><option value="1007">Process Activity</option><option value="0">Base Event</option></select>
+          <input type="text" id="ev-uid" placeholder="Look up event UUID" style="width:260px">
+          <button class="btn" id="ev-refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="ev-layout">
+        <div class="card ev-list">
+          <table>
+            <thead><tr><th>Time</th><th>Source</th><th>Class · activity</th><th>Source → destination</th><th>Disposition</th></tr></thead>
+            <tbody id="ev-rows"></tbody>
+          </table>
+        </div>
+        <div class="card inspector">
+          <div class="card-h"><h2>Event inspector</h2><span class="sub mono" id="insp-uid"></span></div>
+          <div class="card-b" id="inspector"><div class="empty">Select an event to see its raw original, normalized record and chain of custody.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================== SELF-HEAL =============================== -->
+    <section class="view" id="view-selfheal">
+      <div class="page-head">
+        <div><h1>Self-heal</h1><p>The DLQ is watched continuously. Unknown formats are clustered, a parser is inferred and validated — a human promotes it.</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" id="sh-replay" type="button">Replay all pending</button>
+          <button class="btn primary" id="sh-run" type="button">Propose now</button>
+        </div>
+      </div>
+
+      <div class="card sh-top">
+        <div class="sh-status">
+          <span class="pill" id="sh-state"><span class="dot"></span>–</span>
+          <div class="stat"><b id="sh-next">–</b><span>next check</span></div>
+          <div class="stat"><b id="sh-pending">–</b><span>pending events</span></div>
+          <div class="stat"><b id="sh-clusters">–</b><span>clusters</span></div>
+          <div class="stat"><b id="sh-cycles">–</b><span>checks run</span></div>
+        </div>
+        <form class="settings" id="sh-settings">
+          <label>Check every <input type="number" min="1" step="1" name="tick_seconds">s</label>
+          <label>Min samples <input type="number" min="1" name="min_samples"></label>
+          <label>Propose at <input type="number" min="1" name="count_threshold"> events</label>
+          <label>or after <input type="number" min="1" name="time_threshold_sec">s</label>
+          <button class="btn sm" type="submit">Apply</button>
+        </form>
+      </div>
+
+      <div class="sh-layout">
+        <div class="grid">
+          <div class="card">
+            <div class="card-h"><h2>Quarantined clusters</h2><span class="sub">grouped by structural signature</span></div>
+            <div id="clusters"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Watcher activity</h2></div>
+            <div class="activity" id="activity"></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <div class="card-h"><h2>Parser proposals</h2>
+              <select id="prop-filter"><option value="open">Open</option><option value="">All</option><option value="promoted">Promoted</option><option value="dismissed">Dismissed</option></select>
+            </div>
+            <div class="prop-list" id="proposals"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2 id="review-title">Review</h2><span class="sub" id="review-sub"></span></div>
+            <div class="card-b" id="review"><div class="empty">Select a proposal to review, edit, dry-run and promote it.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============================== PARSERS =============================== -->
+    <section class="view" id="view-parsers">
+      <div class="page-head">
+        <div><h1>Parser registry</h1><p>One YAML file per source — onboarding is configuration, not code. Every change is regression-tested and versioned.</p></div>
+        <button class="btn" id="parsers-reload" type="button">Reload from disk</button>
+      </div>
+      <div class="card" style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Source</th><th>Product</th><th>Version</th><th>Tokenizer</th><th>OCSF class</th><th class="num">Mapped fields</th><th class="num">Normalized</th><th class="num">DLQ</th><th>History</th><th></th></tr></thead>
+          <tbody id="parser-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-bg" id="modal"><div class="card modal"><div class="card-h"><h2 id="modal-title"></h2><button class="btn sm" id="modal-close" type="button">Close</button></div><div class="card-b" id="modal-body"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------- helpers
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n) => n == null ? "–" : Number(n).toLocaleString();
+const pct = (x) => x == null ? "–" : `${Math.round(x * 100)}%`;
+const api = async (url, opts = {}) => {
+  const r = await fetch(url, opts.body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(opts.body) } : opts);
+  const t = await r.text();
+  try { return JSON.parse(t); } catch { return t; }
+};
+const timeOf = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : "–";
+const ago = (s) => s == null ? "–" : s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`;
+const CLASS_TONE = { 4001: "info", 4002: "violet", 2004: "bad", 1007: "warn", 3002: "warn", 0: "" };
+const classPill = (ev) => `<span class="pill ${CLASS_TONE[ev.class_uid] ?? ""}">${esc(ev.class_name)}</span>`;
+const dispPill = (d) => !d ? '<span class="faint">–</span>' :
+  `<span class="pill ${/block|drop|denied|refuse/i.test(d) ? "bad" : /allow/i.test(d) ? "ok" : /detect/i.test(d) ? "warn" : ""}">${esc(d)}</span>`;
+const ep = (e) => e ? `${esc(e.ip || e.hostname || "?")}${e.port != null ? ":" + esc(e.port) : ""}` : "";
+const flowOf = (ev) => {
+  const s = ep(ev.src_endpoint), d = ep(ev.dst_endpoint);
+  if (s || d) return `${s || "–"} → ${d || "–"}`;
+  if (ev.http_request) return esc(ev.http_request.url?.url_string || "");
+  if (ev.process) return esc(ev.process.cmd_line || ev.process.file?.path || "");
+  return esc(ev.message || ev.finding_info?.title || "");
+};
+function toast(msg, ok = true) {
+  const t = $("toast"); t.textContent = msg; t.className = `toast ${ok ? "ok" : "bad"}`; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), ok ? 4500 : 9000);
+}
+function jsonHtml(obj) {
+  const s = JSON.stringify(obj, null, 2) ?? "";
+  return esc(s).replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)/g,
+    (m, str, colon, lit, num) => str ? (colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`)
+      : lit ? `<span class="j-lit">${lit}</span>` : `<span class="j-num">${num}</span>`);
+}
+function openModal(title, html) { $("modal-title").textContent = title; $("modal-body").innerHTML = html; $("modal").classList.add("open"); }
+$("modal-close").onclick = () => $("modal").classList.remove("open");
+$("modal").onclick = (e) => { if (e.target.id === "modal") $("modal").classList.remove("open"); };
+
+// ---------------------------------------------------------------- theme
+(() => {
+  let saved = null;
+  try { saved = localStorage.getItem("ulpf-theme"); } catch {}
+  if (saved) document.documentElement.dataset.theme = saved;
+  $("theme-btn").onclick = () => {
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("ulpf-theme", next); } catch {}
+  };
+})();
+
+// ---------------------------------------------------------------- routing
+const VIEWS = ["overview", "events", "selfheal", "parsers"];
+const PATH_VIEW = { "/": "overview", "/dashboard": "overview", "/events": "events", "/selfheal": "selfheal", "/parsers": "parsers" };
+let current = null;
+function route() {
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : (PATH_VIEW[location.pathname] || "overview");
+  current = v;
+  document.querySelectorAll(".view").forEach((el) => el.classList.toggle("active", el.id === `view-${v}`));
+  document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.dataset.view === v));
+  refreshCurrent();
+}
+window.addEventListener("hashchange", route);
+
+// ---------------------------------------------------------------- overview
+let metricsCache = null, parsersCache = [];
+async function loadOverview() {
+  const [m, hist, feed] = await Promise.all([api("/metrics"), api("/metrics/history"), api("/events/stream?n=25")]);
+  metricsCache = m;
+  $("k-eps").textContent = fmt(m.events_per_second);
+  $("k-eps-avg").textContent = `avg ${fmt(m.avg_events_per_second)} since start`;
+  $("k-ing").textContent = fmt(m.total_ingested);
+  $("k-rate").textContent = m.parse_success_rate_pct == null ? "–" : `${m.parse_success_rate_pct}%`;
+  $("k-parsed").textContent = `${fmt(m.total_parsed)} events`;
+  $("k-dlq").textContent = fmt(m.dlq_pending);
+  $("k-dlq-card").classList.toggle("alert", m.dlq_pending > 0);
+  $("k-dlq-hint").textContent = m.schema_violations ? `${fmt(m.schema_violations)} schema violations` : "quarantined, not dropped";
+  $("k-parsers").textContent = fmt(m.parsers_loaded);
+  $("k-replayed").textContent = fmt(m.total_replayed);
+
+  const stages = [
+    ["Ingest", m.total_ingested, "UDP/TCP syslog · HTTP · file"],
+    ["Raw archive", m.total_ingested, `${m.raw_store_mode} · SHA-256`],
+    ["Buffer", m.buffer_mode === "redis" ? m.total_buffered : m.total_ingested, m.buffer_mode === "redis" ? `Redis · backlog ${fmt(m.buffer_backlog)}` : "direct"],
+    ["Parse + map", m.total_parsed + m.total_dlq, "envelope → tokenize → OCSF"],
+    ["Validate", m.total_parsed, "JSON Schema contract"],
+    ["Sinks", m.total_parsed, (m.sinks || []).join(", ")],
+  ];
+  $("flow").innerHTML = stages.map(([t, v, d], i) =>
+    `${i ? '<span class="arrow">→</span>' : ""}<div class="stage"><div class="t">${esc(t)}</div><div class="v">${fmt(v)}</div><div class="d">${esc(d)}</div></div>`
+  ).join("") + `<span class="arrow">↘</span><div class="stage dlq"><div class="t">DLQ</div><div class="v">${fmt(m.total_dlq)}</div><div class="d">${fmt(m.dlq_pending)} pending · ${fmt(m.total_replayed)} healed</div></div>`;
+
+  drawChart(hist);
+  renderSources(m);
+  $("feed").innerHTML = feed.length ? feed.map((ev) => `
+    <div class="feed-row" data-uid="${esc(ev.metadata.uid)}">
+      <span class="faint mono">${esc(timeOf(ev.metadata.ingest_time))}</span>
+      <span class="cls">${classPill(ev)}</span>
+      <span class="src"><b>${esc(ev.metadata.source_id)}</b> · ${flowOf(ev)}</span>
+    </div>`).join("") : '<div class="empty">No events yet. Run <code>python tools/generate_sample_logs.py --scenario demo</code></div>';
+  updateFooter(m);
+}
+function drawChart(hist) {
+  const svg = $("chart"), W = 600, H = 170, pad = 18;
+  const pts = hist.slice(-120);
+  if (!pts.length) { svg.innerHTML = ""; return; }
+  const max = Math.max(5, ...pts.map((p) => p.ingested));
+  const x = (i) => (i / Math.max(1, pts.length - 1)) * W;
+  const y = (v) => H - pad - (v / max) * (H - pad * 2);
+  const line = (k) => pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+  const area = `${line("parsed")}L${W},${H - pad}L0,${H - pad}Z`;
+  const grid = [0, 0.5, 1].map((f) => `<line x1="0" x2="${W}" y1="${y(max * f)}" y2="${y(max * f)}" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"/><text x="4" y="${y(max * f) - 3}" font-size="10" fill="var(--faint)">${Math.round(max * f)}/s</text>`).join("");
+  svg.innerHTML = `${grid}<path d="${area}" fill="var(--accent)" opacity=".12"/><path d="${line("parsed")}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="${line("dlq")}" fill="none" stroke="var(--bad)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+}
+function renderSources(m) {
+  const per = m.per_source || {};
+  const byId = Object.fromEntries(parsersCache.map((p) => [p.source_id, p]));
+  const rows = Object.entries(per).filter(([, v]) => v.parsed || v.dlq).sort((a, b) => (b[1].parsed || 0) - (a[1].parsed || 0));
+  const total = rows.reduce((s, [, v]) => s + (v.parsed || 0), 0) || 1;
+  const now = Date.now() / 1000;
+  $("sources").innerHTML = rows.length ? rows.map(([sid, v]) => {
+    const p = byId[sid]?.product;
+    return `<tr><td class="mono">${esc(sid)}</td><td>${p ? esc(`${p.vendor_name} ${p.name}`) : '<span class="faint">unknown</span>'}</td>
+      <td class="num">${fmt(v.parsed || 0)}</td><td class="num">${v.dlq ? `<span style="color:var(--bad)">${fmt(v.dlq)}</span>` : "0"}</td>
+      <td><div class="bar"><i style="width:${((v.parsed || 0) / total * 100).toFixed(1)}%"></i></div></td>
+      <td class="faint">${v.last_seen ? ago(now - v.last_seen) + " ago" : "–"}</td></tr>`;
+  }).join("") : '<tr><td colspan="6"><div class="empty">Waiting for traffic…</div></td></tr>';
+}
+function updateFooter(m) {
+  $("f-buffer").textContent = m.buffer_mode; $("f-raw").textContent = m.raw_store_mode;
+  $("f-sinks").textContent = (m.sinks || []).join(","); $("f-uptime").textContent = ago(m.uptime_seconds);
+  $("f-sh").textContent = m.selfheal_running ? "watching" : "off";
+  $("nav-dlq").textContent = m.dlq_pending ? m.dlq_pending : "";
+}
+$("feed").addEventListener("click", (e) => { const r = e.target.closest("[data-uid]"); if (r) { location.hash = "events"; inspect(r.dataset.uid); } });
+
+// ---------------------------------------------------------------- events
+let selectedUid = null;
+async function loadEvents() {
+  const src = $("ev-source").value, cls = $("ev-class").value;
+  const q = new URLSearchParams({ n: 80 }); if (src) q.set("source", src); if (cls !== "") q.set("class_uid", cls);
+  const evs = await api(`/events/recent?${q}`);
+  $("ev-rows").innerHTML = evs.length ? evs.map((ev) => `
+    <tr class="clickable ${ev.metadata.uid === selectedUid ? "selected" : ""}" data-uid="${esc(ev.metadata.uid)}">
+      <td class="mono faint">${esc(timeOf(ev.time_dt))}</td>
+      <td class="mono">${esc(ev.metadata.source_id)}</td>
+      <td>${classPill(ev)} <span class="faint">${esc(ev.activity_name)}</span></td>
+      <td class="mono" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${flowOf(ev)}</td>
+      <td>${dispPill(ev.disposition)}</td></tr>`).join("")
+    : '<tr><td colspan="5"><div class="empty">No normalized events match.</div></td></tr>';
+}
+$("ev-rows").addEventListener("click", (e) => { const r = e.target.closest("[data-uid]"); if (r) inspect(r.dataset.uid); });
+$("ev-source").onchange = loadEvents; $("ev-class").onchange = loadEvents; $("ev-refresh").onclick = loadEvents;
+$("ev-uid").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.value.trim()) inspect(e.target.value.trim()); });
+
+let inspTab = "normalized";
+async function inspect(uid) {
+  selectedUid = uid;
+  document.querySelectorAll("#ev-rows tr").forEach((tr) => tr.classList.toggle("selected", tr.dataset.uid === uid));
+  $("insp-uid").textContent = uid;
+  $("inspector").innerHTML = '<div class="empty">Loading…</div>';
+  const [detail, raw] = await Promise.all([api(`/events/${encodeURIComponent(uid)}`), api(`/events/${encodeURIComponent(uid)}/raw`)]);
+  if (detail.error && raw.error) { $("inspector").innerHTML = `<div class="empty">${esc(detail.error)}</div>`; return; }
+  const ev = detail.event, dlq = detail.dlq, md = ev?.metadata || {};
+  const verified = raw.verified === true;
+  const trace = `
+    <div class="trace">
+      <div class="step"><div class="t">1 · Raw archived</div><div class="v">${esc(raw.raw_ref || dlq?.raw_ref || "–")}</div></div>
+      <div class="step"><div class="t">2 · Integrity</div><div class="v">${raw.error ? '<span class="pill bad">missing</span>' : verified ? '<span class="pill ok">✓ SHA-256 verified</span>' : '<span class="pill bad">✗ hash mismatch</span>'}</div></div>
+      <div class="step"><div class="t">3 · ${ev ? "Normalized by" : "Quarantined"}</div><div class="v">${ev ? esc(`${md.parser?.id} ${md.parser?.version}`) : esc(dlq?.reason || "dlq")}</div></div>
+    </div>`;
+  const chain = `<dl class="kv">
+      <dt>Event UUID</dt><dd>${esc(uid)}</dd>
+      <dt>Stored SHA-256</dt><dd>${esc(raw.stored_sha256 || "–")}</dd>
+      <dt>Recomputed SHA-256</dt><dd>${esc(raw.computed_sha256 || "–")}</dd>
+      <dt>Hash in record</dt><dd>${esc(md.raw_sha256 || dlq?.raw_sha256 || "–")}</dd>
+      <dt>Ingest channel</dt><dd>${esc(md.ingest_channel || dlq?.channel || "–")}</dd>
+      <dt>Ingest time</dt><dd>${esc(md.ingest_time || dlq?.ingest_time || "–")}</dd>
+      <dt>Original timestamp</dt><dd>${esc(md.original_time || "–")}</dd>
+      <dt>Product</dt><dd>${esc(md.product ? `${md.product.vendor_name} ${md.product.name}` : "–")}</dd>
+      <dt>Syslog envelope</dt><dd>${esc(md.envelope ? `${md.envelope.format} · host ${md.envelope.hostname || "–"} · app ${md.envelope.app_name || "–"}` : "none")}</dd>
+      ${dlq ? `<dt>DLQ error</dt><dd>${esc(dlq.error)}</dd>` : ""}
+    </dl>`;
+  const panes = {
+    normalized: ev ? `<pre class="code">${jsonHtml(ev)}</pre>` : '<div class="empty">Not normalized — see raw and chain.</div>',
+    raw: `<pre class="code">${esc(raw.raw_text ?? dlq?.raw_snippet ?? "")}</pre><p class="faint" style="font-size:12px;margin:8px 0 0">Exact bytes as received, read back from the ${esc((raw.raw_ref || "").split("://")[0] || "raw")} archive.</p>`,
+    chain,
+    unmapped: ev?.unmapped ? `<pre class="code">${jsonHtml(ev.unmapped)}</pre><p class="faint" style="font-size:12px;margin:8px 0 0">Vendor fields without an OCSF home are kept here, not discarded.</p>` : '<div class="empty">Every token was mapped.</div>',
+  };
+  const tabs = [["normalized", "Normalized (OCSF)"], ["raw", "Raw original"], ["chain", "Chain of custody"], ["unmapped", "Unmapped"]];
+  const render = () => {
+    $("inspector").innerHTML = trace + `<div class="tabs">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${k === inspTab ? "active" : ""}">${l}</button>`).join("")}</div>` + panes[inspTab];
+    $("inspector").querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { inspTab = b.dataset.tab; render(); }));
+  };
+  render();
+}
+
+// ---------------------------------------------------------------- self-heal
+let shStatus = null, selectedProposal = null, settingsDirty = false;
+const STATE = {
+  waiting_min: ["Collecting samples", ""], waiting: ["Waiting for threshold", "info"], ready: ["Proposing…", "violet"],
+  refresh: ["Refreshing proposal", "violet"], proposed: ["Proposal ready", "ok"],
+};
+async function loadSelfheal() {
+  const s = await api("/api/selfheal/status");
+  shStatus = s;
+  const st = $("sh-state");
+  st.className = `pill ${s.running ? "ok" : "warn"}`;
+  st.innerHTML = `<span class="dot ${s.running ? "live" : ""}"></span>${s.running ? "Watching DLQ" : s.enabled ? "Stopped" : "Disabled"}`;
+  $("sh-next").textContent = s.next_tick_in == null ? "–" : `${s.next_tick_in}s`;
+  $("sh-pending").textContent = fmt(s.pending_events);
+  $("sh-clusters").textContent = fmt(s.clusters.length);
+  $("sh-cycles").textContent = fmt(s.cycles);
+  $("f-sh").textContent = s.running ? "watching" : "off";
+  $("nav-dlq").textContent = s.pending_events ? s.pending_events : "";
+  if (!settingsDirty) for (const [k, v] of Object.entries(s.settings)) { const i = document.querySelector(`#sh-settings [name=${k}]`); if (i && document.activeElement !== i) i.value = v; }
+
+  const set = s.settings;
+  $("clusters").innerHTML = s.clusters.length ? s.clusters.map((c) => {
+    const [label, tone] = STATE[c.state] || [c.state, ""];
+    const countPct = Math.min(100, (c.counted ?? c.count) / set.count_threshold * 100);
+    const timePct = Math.min(100, c.age_seconds / set.time_threshold_sec * 100);
+    const drift = c.reasons.includes("tokenize_failed") || c.reasons.includes("schema_violation");
+    return `<div class="cluster">
+      <div class="cluster-h"><span class="name" title="${esc(c.label)}">${esc(c.label)}</span><span class="pill ${tone}">${c.busy ? "Working…" : label}</span></div>
+      <div class="cluster-meta"><span class="mono">${esc(c.channel)}</span> · <b>${fmt(c.count)}</b> events ·
+        ${drift ? `<span class="pill warn">drift in ${esc(c.parser_ids.join(", "))}</span>` : `<span class="pill">no parser matched</span>`}
+        <span class="faint">${esc(c.format_guess || "")}</span></div>
+      ${c.state === "proposed" ? "" : `<div class="progress-row">
+        <div>Count ${fmt(c.counted ?? c.count)} / ${set.count_threshold}<div class="bar ${countPct >= 100 ? "ok" : ""}"><i style="width:${countPct}%"></i></div></div>
+        <div>Age ${ago(c.age_seconds)} / ${ago(set.time_threshold_sec)}<div class="bar ${timePct >= 100 ? "ok" : "warn"}"><i style="width:${timePct}%"></i></div></div></div>`}
+      ${(c.samples || []).slice(0, 2).map((x) => `<div class="sample" title="${esc(x)}">${esc(x)}</div>`).join("")}
+      <div class="cluster-actions">
+        ${c.proposal_id ? `<button class="btn sm primary" data-open="${c.proposal_id}" type="button">Review proposal #${c.proposal_id}</button>` : `<button class="btn sm" data-propose="${esc(c.cluster_id)}" type="button">Propose now</button>`}
+        <button class="btn sm danger" data-dismiss="${esc(c.cluster_id)}" type="button">Dismiss as noise</button>
+      </div></div>`;
+  }).join("") : '<div class="empty">DLQ is empty — every event parsed. Try <code>generate_sample_logs.py --scenario drift</code>.</div>';
+
+  $("activity").innerHTML = s.activity.length ? s.activity.map((a) =>
+    `<div><time>${esc(timeOf(a.ts))}</time><span style="color:${a.level === "error" ? "var(--bad)" : a.level === "proposal" ? "var(--text)" : "var(--muted)"}">${esc(a.message)}</span></div>`
+  ).join("") : '<div class="empty">No activity yet.</div>';
+}
+async function loadProposals() {
+  const status = $("prop-filter").value;
+  const list = await api(`/api/selfheal/proposals${status ? `?status=${status}` : ""}`);
+  $("proposals").innerHTML = list.length ? list.map((p) => {
+    const reg = p.validation?.regression?.passed;
+    return `<div class="prop ${p.id === selectedProposal ? "selected" : ""}" data-open="${p.id}">
+      <div><div class="title">#${p.id} · ${esc(p.filename)}</div><div class="meta">${esc(p.cluster_label)} · ${esc(p.generator)}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <span class="pill ${p.match_rate >= 0.9 ? "ok" : p.match_rate >= 0.5 ? "warn" : "bad"}">${pct(p.match_rate)} parsed</span>
+        <span class="pill ${reg ? "ok" : "bad"}">${reg ? "regression ✓" : "regression ✗"}</span>
+        ${p.status !== "open" ? `<span class="pill">${esc(p.status)}</span>` : ""}
+      </div></div>`;
+  }).join("") : `<div class="empty">No ${esc(status || "")} proposals. They appear here automatically once a cluster reaches the thresholds.</div>`;
+}
+function checksHtml(v) {
+  if (!v) return "";
+  if (v.valid_config === false) return `<div class="checks"><div><span class="ic bad">✗</span><span>${esc(v.error)}</span></div></div>`;
+  const reg = v.regression || {};
+  return `<div class="checks">
+    <div><span class="ic ${v.match_rate >= 0.9 ? "ok" : v.match_rate >= 0.5 ? "warn" : "bad"}">${v.match_rate >= 0.5 ? "✓" : "✗"}</span><span>Parses <b>${v.parsed}/${v.total}</b> cluster samples end-to-end (tokenize → OCSF → schema)</span></div>
+    <div><span class="ic ${reg.passed ? "ok" : "bad"}">${reg.passed ? "✓" : "✗"}</span><span>Regression corpus: ${reg.passed ? `all ${reg.total} known events still route to the same parser` : `${reg.failed} failure(s)`}</span></div>
+    ${(reg.failures || []).slice(0, 4).map((f) => `<div><span class="ic bad">·</span><span class="mono" style="font-size:11.5px">${esc(f)}</span></div>`).join("")}
+    ${(v.errors || []).map((e) => `<div><span class="ic warn">!</span><span class="mono" style="font-size:11.5px">${esc(e)}</span></div>`).join("")}
+  </div>`;
+}
+async function openProposal(id) {
+  selectedProposal = Number(id);
+  document.querySelectorAll("#proposals .prop").forEach((el) => el.classList.toggle("selected", Number(el.dataset.open) === selectedProposal));
+  const p = await api(`/api/selfheal/proposals/${id}`);
+  if (p.error) return toast(p.error, false);
+  const aw = p.awareness || {};
+  $("review-title").textContent = `Proposal #${p.id}`;
+  $("review-sub").textContent = `${p.generator} · ${p.sample_count} samples`;
+  const open = p.status === "open";
+  $("review").innerHTML = `
+    <div class="cluster-meta" style="margin-top:0">${esc(p.cluster_label)} · <span class="mono">${esc(p.channel)}</span> · status <span class="pill ${open ? "info" : ""}">${esc(p.status)}</span>${p.note ? ` · <span class="faint">${esc(p.note)}</span>` : ""}</div>
+    <div id="rv-checks">${checksHtml(p.validation)}</div>
+    ${(aw.notes || []).length || (aw.recommendations || []).length || (aw.similar_parsers || []).length || (aw.conflicts || []).length ? `
+    <div class="checks" style="margin-top:10px">
+      ${(aw.notes || []).map((n) => `<div><span class="ic info">i</span><span>${esc(n)}</span></div>`).join("")}
+      ${(aw.recommendations || []).map((n) => `<div><span class="ic warn">→</span><span>${esc(n)}</span></div>`).join("")}
+      ${(aw.similar_parsers || []).map((s) => `<div><span class="ic info">≈</span><span><b class="mono">${esc(s.source_id)}</b>: ${esc(s.reason)}</span></div>`).join("")}
+      ${(aw.conflicts || []).map((c) => `<div><span class="ic warn">!</span><span class="mono" style="font-size:11.5px">${esc(c)}</span></div>`).join("")}
+    </div>` : ""}
+    <div style="margin-top:12px"><textarea class="yaml" id="rv-yaml" spellcheck="false" ${open ? "" : "readonly"}>${esc(p.yaml)}</textarea></div>
+    <div class="actions-row">
+      ${open ? `<button class="btn" id="rv-validate" type="button">Dry-run edited YAML</button>
+      <input type="text" id="rv-by" placeholder="Approved by" value="analyst" style="width:140px">
+      <button class="btn good" id="rv-promote" type="button">Promote to live</button>
+      <button class="btn danger" id="rv-dismiss" type="button">Dismiss</button>` : ""}
+    </div>
+    <div class="review-grid">
+      <div><div class="muted" style="font-size:12px;margin-bottom:6px">Sample raw event</div><pre class="code" id="rv-raw">${esc(p.validation?.preview_raw || "")}</pre></div>
+      <div><div class="muted" style="font-size:12px;margin-bottom:6px">Would normalize to</div><pre class="code" id="rv-preview">${p.validation?.preview ? jsonHtml(p.validation.preview) : '<span class="faint">no sample parsed</span>'}</pre></div>
+    </div>`;
+  if (!open) return;
+  $("rv-validate").onclick = async () => {
+    $("rv-validate").disabled = true;
+    const v = await api(`/api/selfheal/proposals/${id}/validate`, { body: { yaml: $("rv-yaml").value } });
+    $("rv-validate").disabled = false;
+    $("rv-checks").innerHTML = checksHtml(v);
+    if (v.preview) $("rv-preview").innerHTML = jsonHtml(v.preview);
+    toast(v.valid_config === false ? v.error : `Dry run: ${v.parsed}/${v.total} samples parse, regression ${v.regression?.passed ? "passed" : "FAILED"}`, v.valid_config !== false && v.regression?.passed);
+  };
+  $("rv-promote").onclick = async () => {
+    $("rv-promote").disabled = true; $("rv-promote").textContent = "Testing & promoting…";
+    const r = await api(`/api/selfheal/proposals/${id}/promote`, { body: { yaml: $("rv-yaml").value, approved_by: $("rv-by").value } });
+    toast(r.success ? r.message : r.error, r.success);
+    if (r.validation) $("rv-checks").innerHTML = checksHtml(r.validation);
+    refreshCurrent(); loadParsers();
+    if (r.success) openProposal(id); else { $("rv-promote").disabled = false; $("rv-promote").textContent = "Promote to live"; }
+  };
+  $("rv-dismiss").onclick = async () => { await api(`/api/selfheal/proposals/${id}/dismiss`, { body: {} }); toast("Proposal dismissed"); openProposal(id); loadProposals(); };
+}
+document.addEventListener("click", async (e) => {
+  const o = e.target.closest("[data-open]"); if (o) { location.hash = "selfheal"; return openProposal(o.dataset.open); }
+  const pr = e.target.closest("[data-propose]");
+  if (pr) { pr.disabled = true; pr.textContent = "Inferring…"; const r = await api("/api/selfheal/run", { body: { cluster_id: pr.dataset.propose } }); await loadSelfheal(); await loadProposals(); if (r.created?.[0]) openProposal(r.created[0].id); return; }
+  const d = e.target.closest("[data-dismiss]");
+  if (d) { const r = await api(`/api/dlq/clusters/${d.dataset.dismiss}/dismiss`, { body: {} }); toast(`Dismissed ${r.dismissed_events} events`); loadSelfheal(); loadProposals(); }
+});
+$("prop-filter").onchange = loadProposals;
+$("sh-run").onclick = async () => { $("sh-run").disabled = true; const r = await api("/api/selfheal/run", { body: {} }); $("sh-run").disabled = false; toast(`${r.created.length} proposal(s) generated`); loadSelfheal(); loadProposals(); };
+$("sh-replay").onclick = async () => { const r = await api("/api/dlq/replay", { body: {} }); toast(`Replayed ${r.attempted}: ${r.parsed} now parse, ${r.still_failing} still unknown`); loadSelfheal(); };
+$("sh-settings").addEventListener("input", () => (settingsDirty = true));
+$("sh-settings").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = Object.fromEntries([...new FormData(e.target)].map(([k, v]) => [k, Number(v)]));
+  const r = await api("/api/selfheal/settings", { body });
+  settingsDirty = false;
+  toast(r.success ? "Watcher settings applied" : r.error, r.success); loadSelfheal();
+};
+
+// ---------------------------------------------------------------- parsers
+const CLASS_NAME = { 4001: "Network Activity", 4002: "HTTP Activity", 2004: "Detection Finding", 1007: "Process Activity", 3002: "Authentication", 4003: "DNS Activity", 0: "Base Event" };
+async function loadParsers() {
+  parsersCache = await api("/api/parsers");
+  const sel = $("ev-source"), cur = sel.value;
+  sel.innerHTML = '<option value="">All sources</option>' + parsersCache.map((p) => `<option value="${esc(p.source_id)}">${esc(p.source_id)}</option>`).join("");
+  sel.value = cur;
+  $("parser-rows").innerHTML = parsersCache.map((p) => `<tr>
+    <td class="mono"><b>${esc(p.source_id)}</b><div class="faint" style="font-size:11px">${esc(p.file)}</div></td>
+    <td>${esc(p.product?.vendor_name)} ${esc(p.product?.name)}</td>
+    <td><span class="pill">${esc(p.version)}</span></td>
+    <td class="mono">${esc(p.tokenizer)}</td>
+    <td>${esc(CLASS_NAME[p.class_uid] ?? p.class_uid)}</td>
+    <td class="num">${fmt(p.mapped_fields)}</td><td class="num">${fmt(p.parsed)}</td>
+    <td class="num">${p.dlq ? `<span style="color:var(--bad)">${fmt(p.dlq)}</span>` : "0"}</td>
+    <td class="faint">${p.history.length ? `${p.history.length} archived` : "–"}</td>
+    <td style="white-space:nowrap"><button class="btn sm" data-yaml="${esc(p.source_id)}" type="button">YAML</button>
+      ${p.history.length ? `<button class="btn sm danger" data-rollback="${esc(p.source_id)}" type="button">Roll back</button>` : ""}</td></tr>`).join("");
+}
+$("parser-rows").addEventListener("click", async (e) => {
+  const y = e.target.closest("[data-yaml]");
+  if (y) { const text = await api(`/api/parsers/${y.dataset.yaml}/yaml`); openModal(`${y.dataset.yaml} parser config`, `<pre class="code" style="max-height:70vh">${esc(text)}</pre>`); }
+  const rb = e.target.closest("[data-rollback]");
+  if (rb && confirm(`Roll back ${rb.dataset.rollback} to its previous version?`)) {
+    const r = await api(`/api/parsers/${rb.dataset.rollback}/rollback`, { body: {} }); toast(r.message || r.error, r.success); loadParsers();
+  }
+});
+$("parsers-reload").onclick = async () => {
+  const r = await api("/api/parsers/reload", { body: {} });
+  toast(r.success ? `Reloaded ${r.parsers.length} parsers (regression ${r.regression.total}/${r.regression.total} passed)` : `${r.error}\n${(r.regression?.failures || []).slice(0, 3).join("\n")}`, r.success);
+  loadParsers();
+};
+
+// ---------------------------------------------------------------- polling
+async function refreshCurrent() {
+  try {
+    if (current === "overview") await loadOverview();
+    else if (current === "events") await loadEvents();
+    else if (current === "selfheal") { await loadSelfheal(); }
+    else if (current === "parsers") await loadParsers();
+    $("live-pill").className = "pill ok"; $("live-pill").innerHTML = '<span class="dot live"></span>Live';
+  } catch (err) {
+    $("live-pill").className = "pill bad"; $("live-pill").innerHTML = '<span class="dot"></span>Disconnected';
+  }
+}
+setInterval(() => { if (current === "overview" || current === "selfheal") refreshCurrent(); }, 2000);
+setInterval(() => { if (current === "selfheal") loadProposals(); }, 5000);
+setInterval(async () => { if (current !== "overview") { try { updateFooter(await api("/metrics")); } catch {} } }, 5000);
+loadParsers().then(() => { route(); loadProposals(); });
+api("/metrics").then(updateFooter).catch(() => {});
+</script>
+</body>
+</html>

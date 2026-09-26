@@ -63,6 +63,8 @@ class EnvConfig:
     SYSLOG_ENABLED: bool = True
     SYSLOG_PORT: int = 5514
     SYSLOG_CHANNEL: str = "udp:5514"
+    SYSLOG_TCP_ENABLED: bool = True
+    SYSLOG_TCP_PORT: int = 5514
 
     # HTTP API Listener Configuration
     HTTP_ENABLED: bool = True
@@ -73,10 +75,6 @@ class EnvConfig:
     FILEWATCHER_PATH: str = "data/incoming/squid_access.log"
     FILEWATCHER_CHANNEL: str = "file:squid"
     FILEWATCHER_POLL_INTERVAL: float = 0.5
-
-    # DLQ Processing Thresholds
-    DLQ_TIME_THRESHOLD: int = 60  # seconds
-    DLQ_COUNT_THRESHOLD: int = 20
 
     # Self-Heal Configuration
     SELFHEAL_ENABLED: bool = True
@@ -95,6 +93,8 @@ class EnvConfig:
         config.SYSLOG_ENABLED = _get_bool("ULPF_SYSLOG_ENABLED", True)
         config.SYSLOG_PORT = _get_int("ULPF_SYSLOG_PORT", 5514, min_val=1, max_val=65535)
         config.SYSLOG_CHANNEL = _get_str("ULPF_SYSLOG_CHANNEL", "udp:5514")
+        config.SYSLOG_TCP_ENABLED = _get_bool("ULPF_SYSLOG_TCP_ENABLED", True)
+        config.SYSLOG_TCP_PORT = _get_int("ULPF_SYSLOG_TCP_PORT", config.SYSLOG_PORT, min_val=1, max_val=65535)
         
         # HTTP API Listener
         config.HTTP_ENABLED = _get_bool("ULPF_HTTP_ENABLED", True)
@@ -105,10 +105,6 @@ class EnvConfig:
         config.FILEWATCHER_PATH = _get_str("ULPF_FILEWATCHER_PATH", "data/incoming/squid_access.log")
         config.FILEWATCHER_CHANNEL = _get_str("ULPF_FILEWATCHER_CHANNEL", "file:squid")
         config.FILEWATCHER_POLL_INTERVAL = _get_float("ULPF_FILEWATCHER_POLL_INTERVAL", 0.5)
-        
-        # DLQ Thresholds
-        config.DLQ_TIME_THRESHOLD = _get_int("ULPF_DLQ_TIME_THRESHOLD", 60)
-        config.DLQ_COUNT_THRESHOLD = _get_int("ULPF_DLQ_COUNT_THRESHOLD", 20)
         
         # Self-Heal
         config.SELFHEAL_ENABLED = _get_bool("ULPF_SELFHEAL_ENABLED", True)
@@ -179,15 +175,6 @@ class EnvConfig:
             "path": config.FILEWATCHER_PATH,
             "channel": config.FILEWATCHER_CHANNEL,
             "poll_interval": config.FILEWATCHER_POLL_INTERVAL
-        }
-
-    @classmethod
-    def get_dlq_config(cls) -> Dict[str, int]:
-        """Get DLQ threshold configuration."""
-        config = cls.load_from_env()
-        return {
-            "time_threshold": config.DLQ_TIME_THRESHOLD,
-            "count_threshold": config.DLQ_COUNT_THRESHOLD
         }
 
     @classmethod

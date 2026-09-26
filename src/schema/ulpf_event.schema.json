@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:ulpf:schema:event:1.0.0",
+  "title": "ULPF Normalized Event (OCSF 1.3 subset)",
+  "description": "Contract every normalized event must satisfy before it reaches a sink. Events that fail are routed to the DLQ with reason 'schema_violation' -- never silently written.",
+  "type": "object",
+  "required": ["class_uid", "class_name", "category_uid", "category_name", "activity_id",
+               "type_uid", "severity_id", "severity", "time", "time_dt", "metadata"],
+  "properties": {
+    "class_uid": {"type": "integer", "enum": [0, 1007, 2004, 3002, 4001, 4002, 4003]},
+    "class_name": {"type": "string"},
+    "category_uid": {"type": "integer", "minimum": 0, "maximum": 6},
+    "category_name": {"type": "string"},
+    "activity_id": {"type": "integer"},
+    "activity_name": {"type": "string"},
+    "type_uid": {"type": "integer"},
+    "type_name": {"type": "string"},
+    "severity_id": {"type": "integer", "enum": [0, 1, 2, 3, 4, 5, 6, 99]},
+    "severity": {"type": "string"},
+    "time": {"type": "integer", "description": "Event time, epoch milliseconds UTC"},
+    "time_dt": {"type": "string", "format": "date-time"},
+    "message": {"type": "string"},
+    "disposition": {"type": "string"},
+    "disposition_id": {"type": "integer"},
+    "action": {"type": "string"},
+    "action_id": {"type": "integer", "enum": [0, 1, 2, 99]},
+    "src_endpoint": {"$ref": "#/definitions/endpoint"},
+    "dst_endpoint": {"$ref": "#/definitions/endpoint"},
+    "connection_info": {
+      "type": "object",
+      "properties": {
+        "protocol_name": {"type": "string"},
+        "protocol_num": {"type": "integer", "minimum": 0, "maximum": 255},
+        "direction": {"type": "string"},
+        "direction_id": {"type": "integer", "enum": [0, 1, 2, 3, 99]}
+      }
+    },
+    "http_request": {"type": "object"},
+    "http_response": {
+      "type": "object",
+      "properties": {"code": {"type": "integer", "minimum": 100, "maximum": 999}}
+    },
+    "finding_info": {
+      "type": "object",
+      "properties": {"title": {"type": "string"}, "uid": {"type": ["string", "integer"]}}
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["uid", "version", "product", "source_id", "parser", "raw_sha256", "raw_ref",
+                   "ingest_channel", "ingest_time"],
+      "properties": {
+        "uid": {"type": "string", "format": "uuid"},
+        "version": {"type": "string"},
+        "product": {
+          "type": "object",
+          "required": ["name", "vendor_name"],
+          "properties": {"name": {"type": "string"}, "vendor_name": {"type": "string"}}
+        },
+        "source_id": {"type": "string"},
+        "log_name": {"type": "string"},
+        "parser": {
+          "type": "object",
+          "required": ["id", "version"],
+          "properties": {"id": {"type": "string"}, "version": {"type": "string"}}
+        },
+        "raw_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "raw_ref": {"type": "string", "pattern": "^(local|minio)://[^/]+/.+$"},
+        "raw_size": {"type": "integer"},
+        "ingest_channel": {"type": "string"},
+        "ingest_time": {"type": "string", "format": "date-time"},
+        "original_time": {"type": "string"},
+        "envelope": {"type": "object"}
+      }
+    },
+    "enrichments": {"type": "object"},
+    "unmapped": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"class_uid": {"const": 4001}}},
+      "then": {"anyOf": [{"required": ["src_endpoint"]}, {"required": ["dst_endpoint"]}]}
+    },
+    {
+      "if": {"properties": {"class_uid": {"const": 4002}}},
+      "then": {"required": ["http_request"]}
+    },
+    {
+      "if": {"properties": {"class_uid": {"const": 2004}}},
+      "then": {"required": ["finding_info"]}
+    }
+  ],
+  "definitions": {
+    "ip": {"type": "string", "anyOf": [{"format": "ipv4"}, {"format": "ipv6"}]},
+    "endpoint": {
+      "type": "object",
+      "properties": {
+        "ip": {"$ref": "#/definitions/ip"},
+        "port": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "hostname": {"type": "string"},
+        "interface_name": {"type": "string"},
+        "zone": {"type": "string"},
+        "svc_name": {"type": "string"}
+      }
+    }
+  }
+}

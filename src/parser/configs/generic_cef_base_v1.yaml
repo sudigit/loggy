@@ -1,0 +1,35 @@
+# Fallback for CEF events that carry no network endpoints (audit, system, admin events).
+# Tried only if generic_cef fails schema validation for Network Activity.
+source_id: generic_cef_base
+version: v1
+log_name: cef
+product: {name: CEF, vendor_name: unknown}
+priority: 5
+
+fingerprint:
+  type: regex
+  pattern: 'CEF:\d+\|'
+
+tokenize:
+  type: cef
+
+ocsf:
+  class_uid: 0             # Base Event
+  activity: Other
+
+mapping:
+  fields:
+    device_vendor: metadata.product.vendor_name
+    device_product: metadata.product.name
+    device_version: metadata.product.version
+    signature_id: metadata.event_code
+    name: message
+    severity: severity_id
+    suser: actor.user.name
+    dvchost: device.hostname
+  values:
+    severity: {0: 1, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5, 10: 5, low: 2, medium: 3, high: 4, very-high: 5, unknown: 0}
+  timestamp:
+    source: rt
+    format: [epoch_ms, "%b %d %Y %H:%M:%S", "%b %d %H:%M:%S %Y", iso8601]
+    fallback: envelope

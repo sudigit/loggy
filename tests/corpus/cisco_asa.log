@@ -1,0 +1,5 @@
+<166>Sep 16 2026 10:22:01 asa-fw : %ASA-4-106023: Deny tcp src outside:203.0.113.19/51820 dst inside:10.1.2.15/443 by access-group "outside_access_in" [0x0, 0x0]
+%ASA-4-106023: Deny udp src outside:198.51.100.23/5353 dst inside:10.1.2.32/161 by access-group 'outside_access_in'
+<166>Sep 16 2026 10:22:02 asa-fw : %ASA-6-302013: Built inbound TCP connection 1234 for outside:198.51.100.23/51820 (198.51.100.23/51820) to inside:10.1.2.15/443 (10.1.2.15/443)
+<166>Sep 16 2026 10:22:09 asa-fw : %ASA-6-302014: Teardown TCP connection 1234 for outside:198.51.100.23/51820 to inside:10.1.2.15/443 duration 0:00:07 bytes 5230 TCP FINs
+<166>Sep 16 2026 10:22:10 asa-fw : %ASA-6-106100: access-list inside_in denied tcp inside/10.1.2.45(51234) -> outside/185.220.101.5(4444) hit-cnt 1 first hit [0x1, 0x0]

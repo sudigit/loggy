@@ -1,0 +1,2 @@
+<13>Sep 16 10:22:01 srx01 LEEF:2.0|Juniper|SRX|21.2|RT_FLOW_SESSION_DENY|^|src=10.1.2.3^dst=8.8.8.8^srcPort=51234^dstPort=53^proto=17^action=deny^sev=5^devTime=1758017521000
+LEEF:1.0|Imperva|WAF|14.7|Blocked	src=203.0.113.19	dst=10.1.2.88	srcPort=51820	dstPort=443	proto=TCP	action=block	sev=8

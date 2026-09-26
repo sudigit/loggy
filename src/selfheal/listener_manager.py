@@ -6,7 +6,7 @@ all listeners (syslog, HTTP, file watcher) based on EnvConfig settings.
 """
 import logging
 import threading
-from typing import Dict, Optional
+from typing import Dict
 
 from src.config_env.env_config import EnvConfig
 from src.selfheal.models import ListenerStatus
@@ -98,9 +98,15 @@ class ListenerManager:
                     logger.warning("Syslog listener already running")
                     return True
                 
-                thread = syslog_listener.start_background(self.config.SYSLOG_PORT)
+                thread = syslog_listener.start_background(self.config.SYSLOG_PORT, self.config.SYSLOG_CHANNEL)
                 self._listeners["syslog"] = thread
                 logger.info(f"Syslog listener started on port {self.config.SYSLOG_PORT}")
+                if self.config.SYSLOG_TCP_ENABLED:
+                    try:
+                        self._listeners["syslog_tcp"] = syslog_listener.start_tcp_background(
+                            self.config.SYSLOG_TCP_PORT, f"tcp:{self.config.SYSLOG_TCP_PORT}")
+                    except OSError as e:
+                        logger.error(f"TCP syslog listener failed: {e}")
                 return True
         except Exception as e:
             logger.error(f"Failed to start syslog listener: {e}")
@@ -137,7 +143,10 @@ class ListenerManager:
                     logger.warning("File watcher already running")
                     return True
                 
+                from src import config as app_config
                 path = Path(self.config.FILEWATCHER_PATH)
+                if not path.is_absolute():
+                    path = app_config.BASE_DIR / path
                 thread = file_watcher.start_background(
                     path=path,
                     channel=self.config.FILEWATCHER_CHANNEL,

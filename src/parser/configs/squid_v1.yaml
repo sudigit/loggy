@@ -1,25 +1,45 @@
 # Source: Squid proxy access.log
-# Sample raw line:
+# Native squid format and the simplified demo format:
+#   1758013327.123    195 10.1.2.3 TCP_MISS/200 4120 GET http://example.com/ - HIER_DIRECT/93.184.216.34 text/html
 #   1758013327.123 10.1.2.3 TCP_MISS/200 GET http://example.com
 source_id: squid
-version: v1
-channel: "file:squid"
+version: v2
+log_name: access.log
+product: {name: Squid, vendor_name: Squid Cache}
+channels: ["file:squid"]
+priority: 50
 
 fingerprint:
   type: regex
-  pattern: '^\d+\.\d+\s+\S+\s+\S+/\d+\s+\S+\s+\S+'
+  pattern: '^\s*\d{9,11}\.\d{3}\s+'
 
 tokenize:
   type: regex
-  pattern: '^(?P<epoch>\d+\.\d+)\s+(?P<src>\S+)\s+(?P<status>\S+)\s+(?P<method>\S+)\s+(?P<url>\S+)'
+  on: raw
+  patterns:
+    - '^\s*(?P<epoch>\d+\.\d+)\s+(?P<elapsed>\d+)\s+(?P<src>\S+)\s+(?P<cache>[A-Z_]+)/(?P<code>\d{3})\s+(?P<bytes>\d+)\s+(?P<method>[A-Z]+)\s+(?P<url>\S+)\s+(?P<user>\S+)\s+(?P<hier>[A-Z_]+)/(?P<server>\S+)\s+(?P<ctype>\S+)'
+    - '^\s*(?P<epoch>\d+\.\d+)\s+(?P<src>\S+)\s+(?P<cache>[A-Z_]+)/(?P<code>\d{3})\s+(?P<method>[A-Z]+)\s+(?P<url>\S+)'
+
+ocsf:
+  class_uid: 4002          # HTTP Activity
+  severity_id: 1
 
 mapping:
   fields:
     src: src_endpoint.ip
-    status: http.cache_status
-    method: http.method
-    url: http.url
-  values: {}
+    code: http_response.code
+    method: http_request.http_method
+    url: http_request.url.url_string
+    user: actor.user.name
+    bytes: http_response.length
+    ctype: http_response.content_type
+    elapsed: duration
+  types:
+    http_response.length: int
+    duration: int
+  lookups:
+    - {from: method, to: activity_name, map: {GET: Get, POST: Post, PUT: Put, DELETE: Delete, HEAD: Head, OPTIONS: Options, TRACE: Trace, CONNECT: Connect}, default: Other}
+    - {from: cache, to: disposition, map: {TCP_DENIED: Blocked, NONE_ABORTED: Blocked, TCP_DENIED_REPLY: Blocked}, default: Allowed}
   timestamp:
     source: epoch
     format: epoch

@@ -1,0 +1,54 @@
+# Source: Fortinet FortiGate traffic logs (key=value with quoted values)
+#   <189>date=2026-09-16 time=10:22:01 devname="FGT60D" devid="FGT60D4613000000" logid="0000000013" type="traffic"
+#   subtype="forward" level="notice" srcip=10.1.2.3 srcport=51820 srcintf="port1" dstip=8.8.8.8 dstport=443
+#   dstintf="wan1" proto=6 action="accept" policyid=1 service="HTTPS" sentbyte=1234 rcvdbyte=5678
+source_id: fortigate
+version: v1
+log_name: traffic
+product: {name: FortiGate, vendor_name: Fortinet}
+channels: ["udp:5514"]
+priority: 60
+
+fingerprint:
+  type: regex
+  pattern: 'devname="?[^"\s]+"?.*\btype="?traffic'
+
+tokenize:
+  type: kv
+
+ocsf:
+  class_uid: 4001          # Network Activity
+  activity: Traffic
+
+mapping:
+  fields:
+    srcip: src_endpoint.ip
+    srcport: src_endpoint.port
+    dstip: dst_endpoint.ip
+    dstport: dst_endpoint.port
+    srcintf: src_endpoint.interface_name
+    dstintf: dst_endpoint.interface_name
+    proto: connection_info.protocol_num
+    sessionid: connection_info.uid
+    action: disposition
+    policyid: firewall_rule.uid
+    policyname: firewall_rule.name
+    service: dst_endpoint.svc_name
+    app: app_name
+    sentbyte: traffic.bytes_out
+    rcvdbyte: traffic.bytes_in
+    devname: device.hostname
+    level: severity_id
+  values:
+    action: {deny: Blocked, accept: Allowed, close: Allowed, timeout: Allowed, server-rst: Allowed, client-rst: Allowed, ip-conn: Blocked, dns: Allowed}
+    level: {emergency: 6, alert: 5, critical: 5, error: 4, warning: 3, notice: 1, information: 1, debug: 1}
+  types:
+    traffic.bytes_out: int
+    traffic.bytes_in: int
+  lookups:
+    - {from: action, to: activity_name, map: {deny: Refuse, ip-conn: Refuse, accept: Traffic, close: Close, timeout: Close, server-rst: Reset, client-rst: Reset}, default: Traffic}
+  timestamp:
+    source: [date, time]
+    format: "%Y-%m-%d %H:%M:%S"
+    timezone: UTC
+    fallback: envelope
