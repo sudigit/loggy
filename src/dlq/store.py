@@ -4,11 +4,17 @@ here instead of being dropped (requirement: no information loss). A
 separate offline batch job (src/selfheal/review_dlq.py) periodically
 reviews it -- never inline, never per-event.
 """
+import importlib.util
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 
-from src import config
+# Import config directly to avoid package shadowing issue (src.config vs src/config/)
+_project_root = Path(__file__).parent.parent.parent
+_spec = importlib.util.spec_from_file_location("config", _project_root / "src" / "config.py")
+config = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(config)
 
 _lock = threading.Lock()
 

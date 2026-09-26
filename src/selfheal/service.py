@@ -2,6 +2,8 @@
 Self-healing core service for DLQ analysis, AI proposal generation,
 and regression-tested parser promotion.
 """
+import importlib.util
+import logging
 import re
 import shutil
 import subprocess
@@ -12,8 +14,20 @@ from typing import Dict, List, Optional, Tuple
 import requests
 import yaml
 
-from src import config
+# Import config directly to avoid package shadowing issue (src.config vs src/config/)
+_project_root = Path(__file__).parent.parent.parent
+_spec = importlib.util.spec_from_file_location("config", _project_root / "src" / "config.py")
+config = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(config)
+
 from src.dlq import store as dlq_store
+
+# Import config-aware selfheal components
+from .config_registry import ConfigRegistry, get_registry
+from .dlq_processor import DLQProcessor, get_processor
+from .models import ConfigAwarenessReport, ProposalResult
+
+logger = logging.getLogger(__name__)
 
 
 PROMPT_TEMPLATE = """You are helping onboard a new log source into a security log \
@@ -191,29 +205,127 @@ def _heuristic_skeleton(channel: str, samples: List[str]) -> str:
 
 
 def generate_proposal_for_channel(channel: str) -> dict:
+    """
+    Generate a parser proposal for a given channel with config awareness.
+    
+    This enhanced version:
+    1. Scans ConfigRegistry for similar patterns before generating proposal
+    2. Generates the proposal using Ollama or heuristic fallback
+    3. Checks for duplicate field mappings after generation
+    4. Returns ProposalResult with ConfigAwarenessReport
+    
+    Args:
+        channel: The channel identifier to generate proposal for
+        
+    Returns:
+        Dictionary representation of ProposalResult
+    """
     grouped = dlq_store.pending_grouped_by_channel()
     entries = grouped.get(channel, [])
     samples = [e["raw_snippet"] for e in entries]
-
+    
+    # Initialize config registry and scan existing parsers
+    registry = get_registry()
+    try:
+        registry.scan_configs()
+    except Exception as e:
+        logger.warning(f"Failed to scan config registry: {e}")
+    
+    # Step 1: Find similar parsers before generating proposal
+    similar_parsers: List[str] = []
+    extends_existing: Optional[str] = None
+    
+    # Get existing channels to check for similarity
+    existing_channels = registry.get_supported_channels()
+    if channel in existing_channels:
+        # Channel already exists - recommend extending
+        similar_parsers = [channel]
+        extends_existing = channel
+        logger.info(f"Channel '{channel}' already has a parser - recommending extension")
+    else:
+        # Try to find parsers with similar fingerprint patterns
+        # Use channel name as a proxy for pattern matching
+        similar_configs = registry.find_similar_fingerprint(channel)
+        similar_parsers = [p.source_id for p in similar_configs]
+        if similar_parsers:
+            extends_existing = similar_parsers[0]
+            logger.info(f"Found {len(similar_parsers)} similar parsers for channel '{channel}'")
+    
+    # Step 2: Generate proposal using existing methods
     proposal_yaml, source_tag = _call_ollama(channel, samples)
     if not proposal_yaml:
         proposal_yaml = _heuristic_skeleton(channel, samples)
         source_tag = "Deterministic Heuristic Pattern Sniffer (Air-Gapped)"
-
+    
+    # Step 3: Parse the generated YAML to extract field mappings
+    new_mapping: Dict[str, str] = {}
+    try:
+        parsed_yaml = yaml.safe_load(proposal_yaml)
+        if parsed_yaml and isinstance(parsed_yaml, dict):
+            mapping_section = parsed_yaml.get("mapping", {})
+            if mapping_section and isinstance(mapping_section, dict):
+                new_mapping = mapping_section.get("fields", {})
+    except Exception as e:
+        logger.warning(f"Failed to parse generated YAML for field extraction: {e}")
+    
+    # Step 4: Check for duplicate field mappings
+    duplicate_warnings: List[str] = []
+    if new_mapping:
+        try:
+            duplicate_warnings = registry.get_duplicate_warnings(new_mapping)
+        except Exception as e:
+            logger.warning(f"Failed to get duplicate warnings: {e}")
+    
+    # Step 5: Build recommendations
+    recommendations: List[str] = []
+    
+    if extends_existing:
+        recommendations.append(
+            f"Consider extending existing parser '{extends_existing}' instead of creating new one"
+        )
+        recommendations.append(
+            f"Existing parser handles similar log format - review {extends_existing}_v1.yaml for patterns"
+        )
+    
+    # Add recommendations based on duplicate warnings
+    if duplicate_warnings:
+        recommendations.append(
+            "Review field mappings to avoid conflicts with existing parsers"
+        )
+    
+    # Check if we have enough samples to make a good proposal
+    if len(samples) < 3:
+        recommendations.append(
+            "Consider waiting for more samples before finalizing parser (fewer than 3)"
+        )
+    
+    # Step 6: Build config awareness report
+    config_awareness = ConfigAwarenessReport(
+        similar_parsers=similar_parsers,
+        duplicate_warnings=duplicate_warnings,
+        recommendations=recommendations,
+        extends_existing=extends_existing
+    )
+    
+    # Generate filename
     safe_name = re.sub(r"\W+", "_", channel).strip("_") or "proposed_device"
     filename = f"{safe_name}_proposed.yaml"
-
+    
     # Save candidate to proposed directory
     out_path = config.PARSER_PROPOSED_DIR / filename
     out_path.write_text(proposal_yaml)
-
-    return {
-        "channel": channel,
-        "filename": filename,
-        "yaml": proposal_yaml,
-        "generator": source_tag,
-        "sample_count": len(samples),
-    }
+    
+    # Create ProposalResult and return as dictionary
+    proposal_result = ProposalResult(
+        channel=channel,
+        filename=filename,
+        yaml=proposal_yaml,
+        generator=source_tag,
+        sample_count=len(samples),
+        config_awareness=config_awareness
+    )
+    
+    return proposal_result.to_dict()
 
 
 def promote_proposal_yaml(filename: str, yaml_content: str) -> Tuple[bool, str]:
@@ -261,3 +373,54 @@ def promote_proposal_yaml(filename: str, yaml_content: str) -> Tuple[bool, str]:
         dlq_store.mark_status([e["id"] for e in grouped[channel]], status="promoted")
 
     return True, f"Regression tests passed (4/4)! Promoted {dest_name} to live registry with zero downtime."
+# DLQ Processor Background Scheduler
+
+def start_dlq_processor(
+    time_threshold_sec: int = 60,
+    count_threshold: int = 20,
+    auto_start: bool = True
+) -> DLQProcessor:
+    """
+    Initialize and optionally start the DLQ processor background scheduler.
+    
+    The DLQ processor monitors the dead letter queue and automatically generates
+    parser proposals when either:
+    - Time threshold is met (default: 60 seconds since last processing)
+    - Count threshold is met (default: 20 pending entries)
+    
+    Args:
+        time_threshold_sec: Time threshold in seconds (default: 60)
+        count_threshold: Count threshold for pending entries (default: 20)
+        auto_start: If True, immediately process pending entries (default: True)
+    
+    Returns:
+        Initialized DLQProcessor instance
+    
+    Example:
+        >>> processor = start_dlq_processor(time_threshold_sec=30, count_threshold=10)
+        >>> # The processor will now run in the background
+    """
+    processor = get_processor(
+        time_threshold_sec=time_threshold_sec,
+        count_threshold=count_threshold
+    )
+    
+    if auto_start:
+        logger.info("DLQ processor auto-start enabled, processing pending entries...")
+        result = processor.process_pending()
+        logger.info(
+            f"Initial processing complete: {result.channels_processed} channels, "
+            f"{result.entries_processed} entries"
+        )
+    
+    return processor
+
+
+def get_dlq_processor() -> DLQProcessor:
+    """
+    Get the current DLQProcessor instance.
+    
+    Returns:
+        The singleton DLQProcessor instance
+    """
+    return get_processor()
