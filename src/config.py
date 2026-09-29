@@ -118,8 +118,12 @@ MINIO_SECRET_KEY = os.environ.get("ULPF_MINIO_SECRET_KEY", "")
 MINIO_BUCKET = os.environ.get("ULPF_MINIO_BUCKET", "ulpf-raw-events")
 MINIO_SECURE = _bool("ULPF_MINIO_SECURE", False)
 
-# Output sinks (comma-separated): jsonl, elastic, syslog_cef, kafka
+# Output sinks (comma-separated): jsonl, elastic, minio, syslog_cef, kafka
 SINKS = [s.strip() for s in os.environ.get("ULPF_SINKS", "jsonl").split(",") if s.strip()]
+# The minio sink reuses the MINIO_* connection settings above.
+MINIO_NORMALIZED_BUCKET = os.environ.get("ULPF_MINIO_NORMALIZED_BUCKET", "ulpf-normalized-events")
+MINIO_SINK_BATCH_SIZE = _int("ULPF_MINIO_SINK_BATCH_SIZE", 500)
+MINIO_SINK_FLUSH_SECONDS = _float("ULPF_MINIO_SINK_FLUSH_SECONDS", 5)
 ELASTIC_URL = os.environ.get("ULPF_ELASTIC_URL", "http://localhost:9200")
 ELASTIC_INDEX = os.environ.get("ULPF_ELASTIC_INDEX", "ulpf-events")
 ELASTIC_BATCH_SIZE = _int("ULPF_ELASTIC_BATCH_SIZE", 500)

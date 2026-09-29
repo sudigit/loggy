@@ -112,6 +112,17 @@ def schema():
     return app.response_class(config.SCHEMA_PATH.read_text(encoding="utf-8"), mimetype="application/json")
 
 
+@app.get("/api/storage")
+def storage():
+    """Where raw and normalized copies live, so the UI can label them."""
+    return jsonify({
+        "raw_store": raw_store.get_store_mode(),
+        "raw_bucket": config.MINIO_BUCKET,
+        "sinks": config.SINKS,
+        "normalized_bucket": config.MINIO_NORMALIZED_BUCKET,
+    })
+
+
 # ------------------------------------------------------------------ events
 def _read_jsonl_tail(folder: Path, n: int) -> list:
     files = sorted(folder.glob("*.jsonl"))

@@ -189,6 +189,20 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
 .modal-bg { position: fixed; inset: 0; background: rgba(10,12,16,.45); display: none; align-items: center; justify-content: center; z-index: 40; padding: 20px; }
 .modal-bg.open { display: flex; }
 .modal { width: min(820px, 100%); max-height: 88vh; overflow: auto; }
+.modal.wide { width: min(1440px, 100%); }
+
+/* ---------- side-by-side raw ↔ normalized ---------- */
+.sbs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.sbs-h { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.sbs-h b { font-size: 12.5px; }
+.sbs-h .loc { font: 11px var(--mono); color: var(--muted); word-break: break-all; }
+.sbs pre.code { max-height: 520px; position: relative; }
+.modal.wide .sbs pre.code { max-height: calc(88vh - 190px); }
+.sbs-norm .linked { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.sbs-norm .linked.hot { background: var(--accent-soft); border-radius: 3px; }
+.sbs-raw mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; box-shadow: 0 0 0 1px var(--accent); }
+.sbs-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+@media (max-width: 720px) { .sbs { grid-template-columns: minmax(0, 1fr); } }
 
 @media (max-width: 1180px) {
   .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -408,7 +422,7 @@ function jsonHtml(obj) {
     (m, str, colon, lit, num) => str ? (colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`)
       : lit ? `<span class="j-lit">${lit}</span>` : `<span class="j-num">${num}</span>`);
 }
-function openModal(title, html) { $("modal-title").textContent = title; $("modal-body").innerHTML = html; $("modal").classList.add("open"); }
+function openModal(title, html, wide = false) { $("modal-title").textContent = title; $("modal-body").innerHTML = html; $("modal").querySelector(".modal").classList.toggle("wide", wide); $("modal").classList.add("open"); }
 $("modal-close").onclick = () => $("modal").classList.remove("open");
 $("modal").onclick = (e) => { if (e.target.id === "modal") $("modal").classList.remove("open"); };
 
@@ -530,13 +544,71 @@ $("ev-rows").addEventListener("click", (e) => { const r = e.target.closest("[dat
 $("ev-source").onchange = loadEvents; $("ev-class").onchange = loadEvents; $("ev-refresh").onclick = loadEvents;
 $("ev-uid").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.value.trim()) inspect(e.target.value.trim()); });
 
-let inspTab = "normalized";
+let inspTab = "side", storageInfo = null;
+
+// Where each copy of an event lives, as a human-readable label.
+function rawLocation(ref) {
+  if (!ref) return "–";
+  const [mode, path] = ref.split("://");
+  if (mode === "minio") return `MinIO · ${storageInfo?.raw_bucket || "raw bucket"}/${path}.raw.gz`;
+  const seg = path.match(/^([^/]+)\/([^@]+)@(\d+)#/);
+  return seg ? `Local disk · data/raw/${seg[1]}/${seg[2]} (offset ${seg[3]})` : `Local disk · data/raw/${path}.raw.gz`;
+}
+function normalizedLocations(md) {
+  const source = md.source_id || md.product?.vendor_name || "?", day = (md.ingest_time || "").slice(0, 10);
+  const sinks = storageInfo?.sinks || ["jsonl"], out = [];
+  if (sinks.includes("jsonl")) out.push(`Local disk · data/normalized/${source}/${day}.jsonl`);
+  if (sinks.includes("minio")) out.push(`MinIO · ${storageInfo.normalized_bucket}/${source}/${day}/`);
+  return out.join("<br>") || "–";
+}
+
+// Raw text with every case-insensitive occurrence of `needle` wrapped in <mark>.
+function rawHtml(text, needle) {
+  if (!needle) return esc(text);
+  const lower = text.toLowerCase(), n = needle.toLowerCase();
+  let out = "", i = 0, j;
+  while ((j = lower.indexOf(n, i)) !== -1) { out += esc(text.slice(i, j)) + `<mark>${esc(text.slice(j, j + n.length))}</mark>`; i = j + n.length; }
+  return out + esc(text.slice(i));
+}
+
+function compareHtml(ev, rawText, rawRef) {
+  return `<div class="sbs">
+      <div><div class="sbs-h"><b>Raw original</b><span class="loc">${esc(rawLocation(rawRef))}</span></div><pre class="code sbs-raw">${esc(rawText)}</pre></div>
+      <div><div class="sbs-h"><b>Normalized (OCSF)</b><span class="loc">${ev ? normalizedLocations(ev.metadata || {}) : "not normalized"}</span></div>
+        <pre class="code sbs-norm">${ev ? jsonHtml(ev) : "Not normalized — this event is in the DLQ."}</pre></div>
+    </div>
+    <div class="sbs-foot"><span class="sbs-count"></span><button class="btn sm sbs-full" type="button">⤢ Full screen</button></div>`;
+}
+
+// Underline normalized values that occur in the raw bytes; hovering one highlights it in the raw pane.
+function bindCompare(root, rawText) {
+  const rawPre = root.querySelector(".sbs-raw"), lower = rawText.toLowerCase();
+  let linked = 0;
+  root.querySelectorAll(".sbs-norm .j-str, .sbs-norm .j-num").forEach((el) => {
+    let v = el.textContent;
+    if (el.classList.contains("j-str")) { try { v = JSON.parse(v); } catch { v = v.slice(1, -1); } }
+    if (String(v).length < 2 || !lower.includes(String(v).toLowerCase())) return;
+    linked++;
+    el.classList.add("linked");
+    el.onmouseenter = () => {
+      el.classList.add("hot");
+      rawPre.innerHTML = rawHtml(rawText, String(v));
+      const m = rawPre.querySelector("mark");
+      if (m) rawPre.scrollTop = m.offsetTop - rawPre.clientHeight / 2;
+    };
+    el.onmouseleave = () => { el.classList.remove("hot"); rawPre.innerHTML = esc(rawText); };
+  });
+  const count = root.querySelector(".sbs-count");
+  if (count) count.textContent = linked ? `${linked} normalized values traced to the raw bytes — hover one to find it` : "";
+}
+
 async function inspect(uid) {
   selectedUid = uid;
   document.querySelectorAll("#ev-rows tr").forEach((tr) => tr.classList.toggle("selected", tr.dataset.uid === uid));
   $("insp-uid").textContent = uid;
   $("inspector").innerHTML = '<div class="empty">Loading…</div>';
   const [detail, raw] = await Promise.all([api(`/events/${encodeURIComponent(uid)}`), api(`/events/${encodeURIComponent(uid)}/raw`)]);
+  storageInfo ??= await api("/api/storage");
   if (detail.error && raw.error) { $("inspector").innerHTML = `<div class="empty">${esc(detail.error)}</div>`; return; }
   const ev = detail.event, dlq = detail.dlq, md = ev?.metadata || {};
   const verified = raw.verified === true;
@@ -558,16 +630,25 @@ async function inspect(uid) {
       <dt>Syslog envelope</dt><dd>${esc(md.envelope ? `${md.envelope.format} · host ${md.envelope.hostname || "–"} · app ${md.envelope.app_name || "–"}` : "none")}</dd>
       ${dlq ? `<dt>DLQ error</dt><dd>${esc(dlq.error)}</dd>` : ""}
     </dl>`;
+  const rawText = raw.raw_text ?? dlq?.raw_snippet ?? "", rawRef = raw.raw_ref || dlq?.raw_ref;
   const panes = {
+    side: compareHtml(ev, rawText, rawRef),
     normalized: ev ? `<pre class="code">${jsonHtml(ev)}</pre>` : '<div class="empty">Not normalized — see raw and chain.</div>',
     raw: `<pre class="code">${esc(raw.raw_text ?? dlq?.raw_snippet ?? "")}</pre><p class="faint" style="font-size:12px;margin:8px 0 0">Exact bytes as received, read back from the ${esc((raw.raw_ref || "").split("://")[0] || "raw")} archive.</p>`,
     chain,
     unmapped: ev?.unmapped ? `<pre class="code">${jsonHtml(ev.unmapped)}</pre><p class="faint" style="font-size:12px;margin:8px 0 0">Vendor fields without an OCSF home are kept here, not discarded.</p>` : '<div class="empty">Every token was mapped.</div>',
   };
-  const tabs = [["normalized", "Normalized (OCSF)"], ["raw", "Raw original"], ["chain", "Chain of custody"], ["unmapped", "Unmapped"]];
+  const tabs = [["side", "Side by side"], ["normalized", "Normalized (OCSF)"], ["raw", "Raw original"], ["chain", "Chain of custody"], ["unmapped", "Unmapped"]];
   const render = () => {
     $("inspector").innerHTML = trace + `<div class="tabs">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${k === inspTab ? "active" : ""}">${l}</button>`).join("")}</div>` + panes[inspTab];
     $("inspector").querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { inspTab = b.dataset.tab; render(); }));
+    if (inspTab !== "side") return;
+    bindCompare($("inspector"), rawText);
+    $("inspector").querySelector(".sbs-full").onclick = () => {
+      openModal(`Raw ↔ normalized · ${uid}`, compareHtml(ev, rawText, rawRef), true);
+      $("modal-body").querySelector(".sbs-full").remove();
+      bindCompare($("modal-body"), rawText);
+    };
   };
   render();
 }

@@ -1,22 +1,25 @@
 """
 Pluggable output sinks (requirement g: efficient SIEM and data-lake integration).
 
-Enable any combination with ULPF_SINKS=jsonl,elastic,syslog_cef,kafka
+Enable any combination with ULPF_SINKS=jsonl,elastic,minio,syslog_cef,kafka
 
   jsonl       append-only JSONL per source per day -> data lake landing zone
               (tools/export_parquet.py turns it into columnar Parquet)
   elastic     Elasticsearch / OpenSearch `_bulk` API, batched in the background
+  minio       batched JSONL objects in a MinIO / S3 bucket (next to the raw archive)
   syslog_cef  re-emits every normalized event as CEF over UDP syslog, so ANY
               legacy SIEM (ArcSight, QRadar, Splunk, Sentinel via AMA) can consume it
   kafka       JSON to a Kafka topic (requires the optional kafka-python package)
 
 A sink failure is logged and counted; it never blocks or crashes ingestion.
 """
+import io
 import json
 import logging
 import queue
 import socket
 import threading
+import uuid
 from datetime import datetime, timezone
 
 from src import config
@@ -124,6 +127,40 @@ class ElasticSink(_BatchingSink):
         resp.raise_for_status()
 
 
+class MinioSink(_BatchingSink):
+    """Uploads normalized events to MinIO / S3 as one JSONL object per source per
+    batch: <bucket>/<source_id>/<YYYY-MM-DD>/<HHMMSS>-<batch-id>.jsonl"""
+    name = "minio"
+
+    def __init__(self):
+        import urllib3
+        from minio import Minio
+        self._client = Minio(
+            endpoint=config.MINIO_ENDPOINT,
+            access_key=config.MINIO_ACCESS_KEY,
+            secret_key=config.MINIO_SECRET_KEY,
+            secure=config.MINIO_SECURE,
+            http_client=urllib3.PoolManager(timeout=5.0, retries=urllib3.Retry(total=2)),
+        )
+        if not self._client.bucket_exists(config.MINIO_NORMALIZED_BUCKET):
+            self._client.make_bucket(config.MINIO_NORMALIZED_BUCKET)
+            logger.info(f"[sink:minio] Created bucket '{config.MINIO_NORMALIZED_BUCKET}'")
+        super().__init__(config.MINIO_SINK_BATCH_SIZE, config.MINIO_SINK_FLUSH_SECONDS)
+
+    def flush(self, batch: list):
+        by_source = {}
+        for ev in batch:
+            by_source.setdefault(ev["metadata"]["source_id"], []).append(ev)
+        now = datetime.now(timezone.utc)
+        for source_id, events in by_source.items():
+            body = "".join(json.dumps(ev, separators=(",", ":")) + "\n" for ev in events).encode("utf-8")
+            key = f"{source_id}/{now:%Y-%m-%d}/{now:%H%M%S}-{uuid.uuid4().hex[:8]}.jsonl"
+            self._client.put_object(
+                bucket_name=config.MINIO_NORMALIZED_BUCKET, object_name=key,
+                data=io.BytesIO(body), length=len(body), content_type="application/x-ndjson",
+            )
+
+
 def _cef_escape_header(v) -> str:
     return str(v).replace("\\", "\\\\").replace("|", "\\|")
 
@@ -185,7 +222,8 @@ class KafkaSink(Sink):
         self._producer.send(config.KAFKA_TOPIC, key=ev["metadata"]["source_id"], value=ev)
 
 
-_REGISTRY = {"jsonl": JsonlSink, "elastic": ElasticSink, "syslog_cef": SyslogCefSink, "kafka": KafkaSink}
+_REGISTRY = {"jsonl": JsonlSink, "elastic": ElasticSink, "minio": MinioSink,
+             "syslog_cef": SyslogCefSink, "kafka": KafkaSink}
 _active = None
 _init_lock = threading.Lock()
 
