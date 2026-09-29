@@ -6,3 +6,5 @@ pandas==2.2.3
 pyarrow==17.0.0
 redis>=5.0.0
 minio>=7.2.0
+jsonschema>=4.0
+fastjsonschema>=2.19
