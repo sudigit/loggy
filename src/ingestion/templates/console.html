@@ -13,7 +13,9 @@
   --ok: #15803d; --ok-soft: #e3f4e8; --warn: #a15c07; --warn-soft: #fcf1de;
   --bad: #b42318; --bad-soft: #fde8e6; --violet: #6b3fd4; --violet-soft: #efe9fc;
   --code-bg: #f6f7f9;
-  --shadow: 0 1px 2px rgba(16,24,40,.05);
+  --shadow: 0 18px 48px rgba(16,24,40,.22);  /* modal only */
+  /* type scale -- every font size in the file comes from here */
+  --fs-2xs: .719rem; --fs-xs: .781rem; --fs-sm: .844rem; --fs-base: .875rem; --fs-md: .969rem; --fs-lg: 1.313rem; --fs-xl: 2.125rem;  /* 11.5/12.5/13.5/14/15.5/21/34px at 16px root */
   --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color-scheme: light;
@@ -25,7 +27,7 @@
     --accent: #6ea0ff; --accent-soft: #1b2a47;
     --ok: #46c07a; --ok-soft: #14301f; --warn: #e3a33f; --warn-soft: #34270f;
     --bad: #f2736b; --bad-soft: #3a1817; --violet: #a88bff; --violet-soft: #271e45;
-    --code-bg: #10141a; --shadow: none; color-scheme: dark;
+    --code-bg: #10141a; --shadow: 0 18px 48px rgba(0,0,0,.65); color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
@@ -34,53 +36,62 @@
   --accent: #6ea0ff; --accent-soft: #1b2a47;
   --ok: #46c07a; --ok-soft: #14301f; --warn: #e3a33f; --warn-soft: #34270f;
   --bad: #f2736b; --bad-soft: #3a1817; --violet: #a88bff; --violet-soft: #271e45;
-  --code-bg: #10141a; --shadow: none; color-scheme: dark;
+  --code-bg: #10141a; --shadow: 0 18px 48px rgba(0,0,0,.65); color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { background: var(--bg); color: var(--text); font: 14px/1.45 var(--sans); }
+body { background: var(--bg); color: var(--text); font: var(--fs-base)/1.45 var(--sans); font-variant-numeric: tabular-nums; }
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--accent); }
-code, .mono { font-family: var(--mono); font-size: 12.5px; }
+code, .mono { font-family: var(--mono); font-size: var(--fs-xs); }
 
 /* ---------- shell ---------- */
 .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 .side { background: var(--surface); border-right: 1px solid var(--border); padding: 18px 14px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: 100vh; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
-.brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--text); color: var(--bg); display: grid; place-items: center; font: 700 12px var(--mono); letter-spacing: -.5px; }
-.brand b { display: block; font-size: 14px; }
-.brand span { display: block; font-size: 11px; color: var(--muted); }
+.brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--text); color: var(--bg); display: grid; place-items: center; font: 700 var(--fs-xs) var(--mono); letter-spacing: -.5px; }
+.brand b { display: block; font-size: var(--fs-base); }
+.brand span { display: block; font-size: var(--fs-2xs); color: var(--muted); }
 nav { display: flex; flex-direction: column; gap: 2px; }
-nav a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 7px; color: var(--muted); text-decoration: none; font-weight: 500; }
+nav a { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; color: var(--muted); text-decoration: none; font-weight: 500; }
 nav a:hover { background: var(--surface-2); color: var(--text); }
+nav .ico { width: 18px; text-align: center; flex: 0 0 18px; }
+nav .lbl { flex: 1; }
 nav a.active { background: var(--accent-soft); color: var(--accent); }
-nav .count { font: 600 11px var(--mono); padding: 1px 7px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); }
+nav .count { font: 600 var(--fs-2xs) var(--mono); padding: 1px 7px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); }
 nav .count:empty { display: none; }
-.side-foot { margin-top: auto; display: grid; gap: 6px; font-size: 12px; color: var(--muted); padding: 0 6px; }
+.side-foot { margin-top: auto; display: grid; gap: 6px; font-size: var(--fs-xs); color: var(--muted); padding: 0 6px; }
 .side-foot div { display: flex; justify-content: space-between; gap: 8px; }
-.side-foot b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: 11.5px; }
-.theme-btn { border: 1px solid var(--border); background: transparent; border-radius: 7px; padding: 5px 8px; cursor: pointer; font-size: 12px; color: var(--muted); }
+.side-foot b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: var(--fs-2xs); }
+.side-foot .side-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.side-tools .theme-btn { white-space: nowrap; flex: 1 0 auto; }
+.theme-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.theme-btn .ico svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+.copy { border: 0; background: none; padding: 0 4px; margin-left: 4px; cursor: pointer; color: var(--faint); font: inherit; vertical-align: baseline; border-radius: 4px; }
+.copy:hover { color: var(--text); background: var(--surface-2); }
+.copy.done { color: var(--ok); }
+.theme-btn { border: 1px solid var(--border); background: transparent; border-radius: 7px; padding: 5px 8px; cursor: pointer; font-size: var(--fs-xs); color: var(--muted); }
 main { padding: 22px 28px 40px; min-width: 0; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-.page-head h1 { font-size: 20px; margin: 0; letter-spacing: -.2px; }
-.page-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.page-head h1 { font-size: var(--fs-lg); margin: 0; letter-spacing: -.2px; }
+.page-head p { margin: 2px 0 0; color: var(--muted); font-size: var(--fs-sm); }
 .view { display: none; }
 .view.active { display: block; }
 
 /* ---------- primitives ---------- */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-.card-h h2 { margin: 0; font-size: 13.5px; font-weight: 600; }
-.card-h .sub { color: var(--muted); font-size: 12px; }
+.card-h h2 { margin: 0; font-size: var(--fs-sm); font-weight: 600; }
+.card-h .sub { color: var(--muted); font-size: var(--fs-xs); }
 .card-b { padding: 14px 16px; }
 .grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
-.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
-.kpi { padding: 12px 14px; }
-.kpi .label { font-size: 12px; color: var(--muted); }
-.kpi .value { font-size: 24px; font-weight: 600; letter-spacing: -.5px; margin-top: 2px; font-variant-numeric: tabular-nums; }
-.kpi .hint { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.kpi { padding: 14px 16px; }
+.kpi .label { font-size: var(--fs-2xs); font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.kpi .value { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -1.2px; line-height: 1.1; margin-top: 10px; }
+.kpi .hint { font-size: var(--fs-2xs); color: var(--faint); margin-top: 2px; }
 .kpi.alert .value { color: var(--bad); }
-.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-2xs); font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
 .pill.ok { background: var(--ok-soft); color: var(--ok); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
@@ -89,19 +100,19 @@ main { padding: 22px 28px 40px; min-width: 0; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
 .dot.live { animation: pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity: .35; } }
-.btn { border: 1px solid var(--border-strong); background: var(--surface); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap; }
+.btn { border: 1px solid var(--border-strong); background: var(--surface); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-weight: 500; font-size: var(--fs-sm); white-space: nowrap; }
 .btn:hover { background: var(--surface-2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { filter: brightness(1.07); }
 .btn.good { background: var(--ok); border-color: var(--ok); color: #fff; }
 .btn.danger { color: var(--bad); }
-.btn.sm { padding: 3px 9px; font-size: 12px; }
+.btn.sm { padding: 3px 9px; font-size: var(--fs-xs); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
-.empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
 table { width: 100%; border-collapse: collapse; }
-th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { text-align: left; font-size: var(--fs-2xs); font-weight: 600; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 tr:last-child td { border-bottom: 0; }
 tr.clickable { cursor: pointer; }
@@ -111,34 +122,34 @@ tr.selected td { background: var(--accent-soft); }
 .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; min-width: 60px; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .bar.warn > i { background: var(--warn); } .bar.ok > i { background: var(--ok); }
-pre.code { margin: 0; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: 12px/1.55 var(--mono); overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: 420px; }
-.kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 12.5px; }
+pre.code { margin: 0; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: var(--fs-xs)/1.55 var(--mono); overflow: auto; white-space: pre-wrap; word-break: break-all; max-height: 420px; }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: var(--fs-xs); }
 .kv dt { color: var(--muted); }
-.kv dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
-input[type=text], input[type=number], select { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 7px; padding: 5px 9px; font-size: 13px; }
+.kv dd { margin: 0; font-family: var(--mono); font-size: var(--fs-xs); word-break: break-all; }
+input[type=text], input[type=number], select { background: var(--surface); border: 1px solid var(--border-strong); border-radius: 7px; padding: 5px 9px; font-size: var(--fs-sm); }
 input[type=number] { width: 78px; }
-textarea.yaml { width: 100%; min-height: 360px; resize: vertical; background: var(--code-bg); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px; font: 12px/1.55 var(--mono); tab-size: 2; }
+textarea.yaml { width: 100%; min-height: 360px; resize: vertical; background: var(--code-bg); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px; font: var(--fs-xs)/1.55 var(--mono); tab-size: 2; }
 textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
-.toast { position: fixed; right: 20px; bottom: 20px; max-width: 520px; padding: 12px 14px; border-radius: 9px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 50; display: none; white-space: pre-wrap; }
+.toast { position: fixed; right: 20px; bottom: 20px; max-width: 520px; padding: 12px 14px; border-radius: 9px; font-size: var(--fs-sm); z-index: 50; display: none; white-space: pre-wrap; }
 .toast.ok { background: var(--ok); color: #fff; } .toast.bad { background: var(--bad); color: #fff; }
 
 /* ---------- overview ---------- */
 .ov-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; }
 .chart { width: 100%; height: 170px; display: block; }
-.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend { display: flex; gap: 14px; font-size: var(--fs-xs); color: var(--muted); }
 .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 .flow { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; padding: 4px 2px 6px; }
 .stage { flex: 1 0 104px; border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; background: var(--surface-2); }
-.stage .t { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
-.stage .v { font: 600 16px var(--mono); margin-top: 3px; }
-.stage .d { font-size: 11px; color: var(--faint); margin-top: 2px; }
-.arrow { align-self: center; color: var(--faint); font-size: 13px; }
+.stage .t { font-size: var(--fs-2xs); color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.stage .v { font: 600 var(--fs-md) var(--mono); margin-top: 3px; }
+.stage .d { font-size: var(--fs-2xs); color: var(--faint); margin-top: 2px; }
+.arrow { align-self: center; color: var(--faint); font-size: var(--fs-sm); }
 .stage.dlq { background: var(--bad-soft); border-color: transparent; }
 .stage.dlq .v { color: var(--bad); }
 .feed { max-height: 360px; overflow: auto; }
-.feed-row { display: grid; grid-template-columns: 64px 118px 1fr; gap: 10px; align-items: center; padding: 7px 16px; border-bottom: 1px solid var(--border); font-size: 12.5px; cursor: pointer; }
+.feed-row { display: grid; grid-template-columns: 64px 118px 1fr; gap: 10px; align-items: center; padding: 7px 16px; border-bottom: 1px solid var(--border); font-size: var(--fs-xs); cursor: pointer; }
 .feed-row:hover { background: var(--surface-2); }
-.feed-row .src { font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-row .src { font-family: var(--mono); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- events ---------- */
 .ev-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; align-items: start; }
@@ -146,66 +157,65 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
 .inspector { position: sticky; top: 16px; }
 .trace { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
 .trace .step { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
-.trace .step .t { font-size: 11px; color: var(--muted); }
-.trace .step .v { font: 12px var(--mono); word-break: break-all; margin-top: 2px; }
+.trace .step .t { font-size: var(--fs-2xs); color: var(--muted); }
+.trace .step .v { font: var(--fs-xs) var(--mono); word-break: break-all; margin-top: 2px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
-.tabs button { border: 0; background: none; padding: 7px 10px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; font-size: 13px; }
+.tabs button { border: 0; background: none; padding: 7px 10px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; font-size: var(--fs-sm); }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 .j-key { color: var(--accent); } .j-str { color: var(--ok); } .j-num { color: var(--violet); } .j-lit { color: var(--warn); }
 
 /* ---------- self-heal ---------- */
 .sh-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; align-items: center; padding: 12px 16px; margin-bottom: 14px; }
-.sh-status { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 13px; }
-.sh-status .stat b { font: 600 15px var(--mono); display: block; }
-.sh-status .stat span { font-size: 11.5px; color: var(--muted); }
-.settings { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.sh-status { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.sh-status .stat b { font: 600 var(--fs-md) var(--mono); display: block; }
+.sh-status .stat span { font-size: var(--fs-2xs); color: var(--muted); }
+.settings { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--fs-xs); color: var(--muted); }
 .settings label { display: flex; align-items: center; gap: 5px; }
 .sh-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 14px; align-items: start; }
 .cluster { padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .cluster:last-child { border-bottom: 0; }
 .cluster-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.cluster-h .name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cluster-meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; font-size: 12px; color: var(--muted); }
-.progress-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; font-size: 11.5px; color: var(--muted); }
+.cluster-h .name { font-weight: 600; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cluster-meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; font-size: var(--fs-xs); color: var(--muted); }
+.progress-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; font-size: var(--fs-2xs); color: var(--muted); }
 .progress-row .bar { margin-top: 3px; }
-.sample { font: 11.5px/1.5 var(--mono); background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sample { font: var(--fs-2xs)/1.5 var(--mono); background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cluster-actions { display: flex; gap: 6px; margin-top: 8px; }
 .prop-list .prop { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .prop-list .prop:hover { background: var(--surface-2); }
 .prop-list .prop.selected { background: var(--accent-soft); }
-.prop .title { font-weight: 600; font-size: 13px; }
-.prop .meta { font-size: 12px; color: var(--muted); }
+.prop .title { font-weight: 600; font-size: var(--fs-sm); }
+.prop .meta { font-size: var(--fs-xs); color: var(--muted); }
 .review-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
-.checks { display: grid; gap: 6px; font-size: 12.5px; }
+.checks { display: grid; gap: 6px; font-size: var(--fs-xs); }
 .checks div { display: flex; gap: 8px; align-items: baseline; }
 .checks .ic { font-weight: 700; width: 14px; flex: 0 0 14px; }
 .ic.ok { color: var(--ok); } .ic.bad { color: var(--bad); } .ic.warn { color: var(--warn); } .ic.info { color: var(--accent); }
 .actions-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
-.activity { max-height: 300px; overflow: auto; font-size: 12.5px; }
+.activity { max-height: 300px; overflow: auto; font-size: var(--fs-xs); }
 .activity div { padding: 7px 16px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 62px 1fr; gap: 8px; }
-.activity time { color: var(--faint); font: 11.5px var(--mono); }
+.activity time { color: var(--faint); font: var(--fs-2xs) var(--mono); }
 
 /* ---------- modal ---------- */
 .modal-bg { position: fixed; inset: 0; background: rgba(10,12,16,.45); display: none; align-items: center; justify-content: center; z-index: 40; padding: 20px; }
 .modal-bg.open { display: flex; }
-.modal { width: min(820px, 100%); max-height: 88vh; overflow: auto; }
+.modal { width: min(820px, 100%); max-height: 88vh; overflow: auto; box-shadow: var(--shadow); }
 .modal.wide { width: min(1440px, 100%); }
 
 /* ---------- side-by-side raw ↔ normalized ---------- */
 .sbs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .sbs-h { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
-.sbs-h b { font-size: 12.5px; }
-.sbs-h .loc { font: 11px var(--mono); color: var(--muted); word-break: break-all; }
+.sbs-h b { font-size: var(--fs-xs); }
+.sbs-h .loc { font: var(--fs-2xs) var(--mono); color: var(--muted); word-break: break-all; }
 .sbs pre.code { max-height: 520px; position: relative; }
 .modal.wide .sbs pre.code { max-height: calc(88vh - 190px); }
 .sbs-norm .linked { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 .sbs-norm .linked.hot { background: var(--accent-soft); border-radius: 3px; }
-.sbs-raw mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; box-shadow: 0 0 0 1px var(--accent); }
-.sbs-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+.sbs-raw mark { white-space: nowrap; background: var(--accent-soft); color: var(--accent); border-radius: 3px; outline: 1px solid var(--accent); }
+.sbs-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; font-size: var(--fs-xs); color: var(--faint); }
 @media (max-width: 720px) { .sbs { grid-template-columns: minmax(0, 1fr); } }
 
 @media (max-width: 1180px) {
-  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ov-grid, .ev-layout, .sh-layout, .review-grid { grid-template-columns: minmax(0, 1fr); }
   .inspector { position: static; }
 }
@@ -215,10 +225,38 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
   nav { flex-direction: row; overflow-x: auto; }
   .side-foot { display: none; }
   main { padding: 16px; }
-  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .review-grid, .trace { grid-template-columns: 1fr; }
   .feed-row { grid-template-columns: 56px 1fr; }
   .feed-row .cls { display: none; }
+}
+
+/* ---------- density ---------- */
+html[data-density="compact"] th, html[data-density="compact"] td { padding: 4px 10px; font-size: var(--fs-xs); }
+html[data-density="compact"] .feed-row { padding: 4px 16px; font-size: var(--fs-2xs); }
+html[data-density="compact"] .cluster, html[data-density="compact"] .prop-list .prop { padding-top: 6px; padding-bottom: 6px; }
+html[data-density="compact"] .activity div { padding: 4px 16px; }
+
+/* ---------- presentation mode ---------- */
+html[data-present] { font-size: 125%; }
+html[data-present] .shell { grid-template-columns: 64px 1fr; }
+html[data-present] .side { padding: 18px 8px; align-items: center; }
+html[data-present] .brand div:last-child, html[data-present] .lbl, html[data-present] .side-foot > div:not(.side-tools), html[data-present] #sh-settings { display: none; }
+html[data-present] nav a { justify-content: center; padding: 10px 0; }
+html[data-present] nav .count { position: absolute; top: -2px; right: -6px; padding: 0 5px; }
+html[data-present] .side-foot { padding: 0; }
+html[data-present] .side-foot .side-tools { flex-direction: column; }
+.kbd-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; align-items: baseline; }
+kbd { font: 600 var(--fs-xs) var(--mono); border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px; padding: 1px 7px; background: var(--surface-2); }
+
+/* ---------- motion: state changes only, 150ms ---------- */
+nav a, .btn, .theme-btn, .copy, td, .feed-row, .prop, .tabs button, .pill, .sbs-norm .linked,
+input, select, textarea { transition: background-color .15s ease, color .15s ease, border-color .15s ease, opacity .15s ease; }
+.feed-row.fresh { animation: fresh .6s ease-out; }
+@keyframes fresh { from { background: var(--accent-soft); } }
+.skel { display: block; height: .9em; border-radius: 4px; background: var(--surface-2); animation: skel 1.2s ease-in-out infinite; }
+@keyframes skel { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 </style>
 </head>
@@ -230,10 +268,10 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
       <div><b>ULPF</b><span>Universal Log Pre-processing</span></div>
     </div>
     <nav>
-      <a href="#overview" data-view="overview">Overview</a>
-      <a href="#events" data-view="events">Events &amp; trace</a>
-      <a href="#selfheal" data-view="selfheal">Self-heal <span class="count" id="nav-dlq"></span></a>
-      <a href="#parsers" data-view="parsers">Parsers</a>
+      <a href="#overview" data-view="overview" title="Overview (1)"><span class="ico">◧</span><span class="lbl">Overview</span></a>
+      <a href="#events" data-view="events" title="Events &amp; trace (2)"><span class="ico">⇄</span><span class="lbl">Events &amp; trace</span></a>
+      <a href="#selfheal" data-view="selfheal" title="Self-heal (3)"><span class="ico">⟲</span><span class="lbl">Self-heal</span><span class="count" id="nav-dlq"></span></a>
+      <a href="#parsers" data-view="parsers" title="Parsers (4)"><span class="ico">{}</span><span class="lbl">Parsers</span></a>
     </nav>
     <div class="side-foot">
       <div>Buffer <b id="f-buffer">–</b></div>
@@ -241,7 +279,12 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
       <div>Sinks <b id="f-sinks">–</b></div>
       <div>Self-heal <b id="f-sh">–</b></div>
       <div>Uptime <b id="f-uptime">–</b></div>
-      <button class="theme-btn" id="theme-btn" type="button">Toggle theme</button>
+      <div class="side-tools">
+        <button class="theme-btn" id="theme-btn" type="button" title="Toggle theme"><span class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg></span><span class="lbl">Theme</span></button>
+        <button class="theme-btn" id="density-btn" type="button" title="Toggle density"><span class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.6" fill="none"/></svg></span><span class="lbl">Compact</span></button>
+        <button class="theme-btn" id="present-btn" type="button" title="Presentation mode"><span class="ico"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" stroke="currentColor" stroke-width="1.6" fill="none"/></svg></span><span class="lbl">Present</span></button>
+        <button class="theme-btn" id="keys-btn" type="button" title="Keyboard shortcuts (?)"><span class="ico">?</span><span class="lbl">Keys</span></button>
+      </div>
     </div>
   </aside>
 
@@ -295,7 +338,7 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
         <div><h1>Events &amp; traceability</h1><p>Normalized record ↔ untouched original, linked by UUID and verified by SHA-256.</p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="ev-source"><option value="">All sources</option></select>
-          <select id="ev-class"><option value="">All classes</option><option value="4001">Network Activity</option><option value="4002">HTTP Activity</option><option value="2004">Detection Finding</option><option value="1007">Process Activity</option><option value="0">Base Event</option></select>
+          <select id="ev-class"><option value="">All classes</option></select>
           <input type="text" id="ev-uid" placeholder="Look up event UUID" style="width:260px">
           <button class="btn" id="ev-refresh" type="button">Refresh</button>
         </div>
@@ -392,7 +435,7 @@ textarea.yaml:focus, input:focus, select:focus { outline: 2px solid var(--accent
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (n) => n == null ? "–" : Number(n).toLocaleString();
-const pct = (x) => x == null ? "–" : `${Math.round(x * 100)}%`;
+const pct = (x) => x == null ? "–" : `${Math.floor(x * 100)}%`;
 const api = async (url, opts = {}) => {
   const r = await fetch(url, opts.body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(opts.body) } : opts);
   const t = await r.text();
@@ -400,6 +443,7 @@ const api = async (url, opts = {}) => {
 };
 const timeOf = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : "–";
 const ago = (s) => s == null ? "–" : s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`;
+const CLASS_NAME = { 4001: "Network Activity", 4002: "HTTP Activity", 2004: "Detection Finding", 1007: "Process Activity", 3002: "Authentication", 4003: "DNS Activity", 0: "Base Event" };
 const CLASS_TONE = { 4001: "info", 4002: "violet", 2004: "bad", 1007: "warn", 3002: "warn", 0: "" };
 const classPill = (ev) => `<span class="pill ${CLASS_TONE[ev.class_uid] ?? ""}">${esc(ev.class_name)}</span>`;
 const dispPill = (d) => !d ? '<span class="faint">–</span>' :
@@ -412,6 +456,42 @@ const flowOf = (ev) => {
   if (ev.process) return esc(ev.process.cmd_line || ev.process.file?.path || "");
   return esc(ev.message || ev.finding_info?.title || "");
 };
+// Integer KPIs count up from their previous value (~300ms ease-out); big jumps (first load) snap.
+function setNum(el, v) {
+  const from = el._v; el._v = v;
+  cancelAnimationFrame(el._raf);
+  const d = v - from;
+  if (!Number.isInteger(v) || !Number.isInteger(from) || !d || Math.abs(d) > 5000 || matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = fmt(v); return; }
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / 300);
+    el.textContent = fmt(Math.round(from + d * (1 - (1 - k) ** 3)));
+    if (k < 1) el._raf = requestAnimationFrame(step);
+  };
+  el._raf = requestAnimationFrame(step);
+}
+const skel = (w = "100%") => `<span class="skel" style="width:${w}"></span>`;
+const skelRows = (n, cols) => Array.from({ length: n }, (_, i) => `<tr>${Array.from({ length: cols }, (_, j) => `<td>${skel(`${45 + ((i * 7 + j * 13) % 45)}%`)}</td>`).join("")}</tr>`).join("");
+const skelLines = (n, cls = "feed-row") => Array.from({ length: n }, (_, i) => `<div class="${cls}" style="display:block">${skel(`${55 + (i * 17) % 40}%`)}</div>`).join("");
+for (const id of ["sources", "ev-rows", "parser-rows"]) $(id).innerHTML = skelRows(5, $(id).closest("table").querySelectorAll("th").length);
+$("feed").innerHTML = skelLines(8);
+for (const id of ["clusters", "proposals"]) $(id).innerHTML = skelLines(3, "cluster");
+const copyBtn = (text) => text && text !== "–" ? `<button class="copy" type="button" data-copy="${esc(text)}" title="Copy" aria-label="Copy">⧉</button>` : "";
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch {}
+  // Fallback for non-secure origins (e.g. console opened over plain http on a LAN IP).
+  const ta = Object.assign(document.createElement("textarea"), { value: text });
+  ta.style.cssText = "position:fixed;opacity:0"; document.body.append(ta); ta.select();
+  let ok = false; try { ok = document.execCommand("copy"); } catch {}
+  ta.remove(); return ok;
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  e.stopPropagation();
+  const ok = await copyText(b.dataset.copy);
+  b.textContent = ok ? "✓" : "✗"; b.classList.toggle("done", ok);
+  clearTimeout(b._t); b._t = setTimeout(() => { b.textContent = "⧉"; b.classList.remove("done"); }, 1200);
+});
 function toast(msg, ok = true) {
   const t = $("toast"); t.textContent = msg; t.className = `toast ${ok ? "ok" : "bad"}`; t.style.display = "block";
   clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), ok ? 4500 : 9000);
@@ -440,6 +520,54 @@ $("modal").onclick = (e) => { if (e.target.id === "modal") $("modal").classList.
   };
 })();
 
+// ---------------------------------------------------------------- density + presentation (persisted like theme)
+function prefToggle(btn, key, attr, on, labelFor) {
+  const apply = (v) => {
+    if (v) document.documentElement.setAttribute(attr, v); else document.documentElement.removeAttribute(attr);
+    btn.setAttribute("aria-pressed", String(!!v));
+    if (labelFor) btn.querySelector(".lbl").textContent = labelFor(v);
+  };
+  let saved = null; try { saved = localStorage.getItem(key); } catch {}
+  apply(saved);
+  btn.onclick = () => {
+    const next = document.documentElement.hasAttribute(attr) ? null : on;
+    apply(next);
+    try { next ? localStorage.setItem(key, next) : localStorage.removeItem(key); } catch {}
+  };
+}
+prefToggle($("density-btn"), "ulpf-density", "data-density", "compact", (v) => v ? "Compact" : "Comfortable");
+prefToggle($("present-btn"), "ulpf-present", "data-present", "on");
+
+// ---------------------------------------------------------------- keyboard
+const KEYS = [["1 – 4", "Switch view"], ["j / k", "Next / previous event (inspects it)"], ["/", "Look up event UUID"], ["Esc", "Close dialog, clear selection"], ["?", "This list"]];
+const showKeys = () => openModal("Keyboard shortcuts", `<div class="kbd-list">${KEYS.map(([k, d]) => `<span>${k.split(" ").map((x) => /^[\w/?]|Esc/.test(x) ? `<kbd>${esc(x)}</kbd>` : esc(x)).join(" ")}</span><span>${esc(d)}</span>`).join("")}</div>`);
+$("keys-btn").onclick = showKeys;
+function clearSelection() {
+  selectedUid = null;
+  document.querySelectorAll("#ev-rows tr.selected").forEach((tr) => tr.classList.remove("selected"));
+  $("insp-uid").textContent = "";
+  $("inspector").innerHTML = '<div class="empty">Select an event to see its raw original, normalized record and chain of custody.</div>';
+}
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t.closest?.("input, textarea, select, [contenteditable]")) return;
+  const modalOpen = $("modal").classList.contains("open");
+  if (e.key === "Escape") { if (modalOpen) $("modal").classList.remove("open"); else clearSelection(); return; }
+  if (modalOpen) return;
+  if (/^[1-4]$/.test(e.key)) { location.hash = VIEWS[e.key - 1]; return; }
+  if (e.key === "?") { showKeys(); return; }
+  if (e.key === "/") { e.preventDefault(); if (current !== "events") location.hash = "events"; $("ev-uid").focus(); return; }
+  if ((e.key === "j" || e.key === "k") && current === "events") {
+    const rows = [...document.querySelectorAll("#ev-rows tr[data-uid]")];
+    if (!rows.length) return;
+    const i = rows.findIndex((r) => r.dataset.uid === selectedUid);
+    const next = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key === "j" ? 1 : -1)))];
+    next.scrollIntoView({ block: "nearest" });
+    inspect(next.dataset.uid);
+  }
+});
+
 // ---------------------------------------------------------------- routing
 const VIEWS = ["overview", "events", "selfheal", "parsers"];
 const PATH_VIEW = { "/": "overview", "/dashboard": "overview", "/events": "events", "/selfheal": "selfheal", "/parsers": "parsers" };
@@ -454,20 +582,20 @@ function route() {
 window.addEventListener("hashchange", route);
 
 // ---------------------------------------------------------------- overview
-let metricsCache = null, parsersCache = [];
+let metricsCache = null, parsersCache = [], feedSeen = null;
 async function loadOverview() {
   const [m, hist, feed] = await Promise.all([api("/metrics"), api("/metrics/history"), api("/events/stream?n=25")]);
   metricsCache = m;
-  $("k-eps").textContent = fmt(m.events_per_second);
+  setNum($("k-eps"), m.events_per_second);
   $("k-eps-avg").textContent = `avg ${fmt(m.avg_events_per_second)} since start`;
-  $("k-ing").textContent = fmt(m.total_ingested);
+  setNum($("k-ing"), m.total_ingested);
   $("k-rate").textContent = m.parse_success_rate_pct == null ? "–" : `${m.parse_success_rate_pct}%`;
   $("k-parsed").textContent = `${fmt(m.total_parsed)} events`;
-  $("k-dlq").textContent = fmt(m.dlq_pending);
+  setNum($("k-dlq"), m.dlq_pending);
   $("k-dlq-card").classList.toggle("alert", m.dlq_pending > 0);
   $("k-dlq-hint").textContent = m.schema_violations ? `${fmt(m.schema_violations)} schema violations` : "quarantined, not dropped";
-  $("k-parsers").textContent = fmt(m.parsers_loaded);
-  $("k-replayed").textContent = fmt(m.total_replayed);
+  setNum($("k-parsers"), m.parsers_loaded);
+  setNum($("k-replayed"), m.total_replayed);
 
   const stages = [
     ["Ingest", m.total_ingested, "UDP/TCP syslog · HTTP · file"],
@@ -483,8 +611,11 @@ async function loadOverview() {
 
   drawChart(hist);
   renderSources(m);
+  const firstFeed = feedSeen === null;  // first render: nothing is "new"
+  const prevSeen = feedSeen || new Set();
+  feedSeen = new Set(feed.map((ev) => ev.metadata.uid));
   $("feed").innerHTML = feed.length ? feed.map((ev) => `
-    <div class="feed-row" data-uid="${esc(ev.metadata.uid)}">
+    <div class="feed-row${!firstFeed && !prevSeen.has(ev.metadata.uid) ? " fresh" : ""}" data-uid="${esc(ev.metadata.uid)}">
       <span class="faint mono">${esc(timeOf(ev.metadata.ingest_time))}</span>
       <span class="cls">${classPill(ev)}</span>
       <span class="src"><b>${esc(ev.metadata.source_id)}</b> · ${flowOf(ev)}</span>
@@ -495,7 +626,7 @@ function drawChart(hist) {
   const svg = $("chart"), W = 600, H = 170, pad = 18;
   const pts = hist.slice(-120);
   if (!pts.length) { svg.innerHTML = ""; return; }
-  const max = Math.max(5, ...pts.map((p) => p.ingested));
+  const max = Math.max(5, ...pts.map((p) => Math.max(p.parsed, p.dlq)));
   const x = (i) => (i / Math.max(1, pts.length - 1)) * W;
   const y = (v) => H - pad - (v / max) * (H - pad * 2);
   const line = (k) => pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
@@ -541,6 +672,7 @@ async function loadEvents() {
     : '<tr><td colspan="5"><div class="empty">No normalized events match.</div></td></tr>';
 }
 $("ev-rows").addEventListener("click", (e) => { const r = e.target.closest("[data-uid]"); if (r) inspect(r.dataset.uid); });
+$("ev-class").insertAdjacentHTML("beforeend", Object.entries(CLASS_NAME).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join(""));
 $("ev-source").onchange = loadEvents; $("ev-class").onchange = loadEvents; $("ev-refresh").onclick = loadEvents;
 $("ev-uid").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.value.trim()) inspect(e.target.value.trim()); });
 
@@ -577,7 +709,7 @@ function compareHtml(ev, rawText, rawRef) {
       <div><div class="sbs-h"><b>Normalized (OCSF)</b><span class="loc">${ev ? normalizedLocations(ev.metadata || {}) : "not normalized"}</span></div>
         <pre class="code sbs-norm">${ev ? jsonHtml(ev) : "Not normalized — this event is in the DLQ."}</pre></div>
     </div>
-    <div class="sbs-foot"><span class="sbs-count"></span><button class="btn sm sbs-full" type="button">⤢ Full screen</button></div>`;
+    <div class="sbs-foot"><span class="sbs-count"></span><button class="btn sm sbs-full" type="button"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>Full screen</button></div>`;
 }
 
 // Underline normalized values that occur in the raw bytes; hovering one highlights it in the raw pane.
@@ -605,10 +737,12 @@ function bindCompare(root, rawText) {
 async function inspect(uid) {
   selectedUid = uid;
   document.querySelectorAll("#ev-rows tr").forEach((tr) => tr.classList.toggle("selected", tr.dataset.uid === uid));
-  $("insp-uid").textContent = uid;
-  $("inspector").innerHTML = '<div class="empty">Loading…</div>';
+  $("insp-uid").innerHTML = esc(uid) + copyBtn(uid);
+  const step = `<div class="step">${skel("40%")}<div style="height:6px"></div>${skel("85%")}</div>`;
+  $("inspector").innerHTML = `<div class="trace">${step.repeat(3)}</div>` + [90, 70, 80, 55, 75, 60].map((w) => `<div style="padding:5px 0">${skel(w + "%")}</div>`).join("");
   const [detail, raw] = await Promise.all([api(`/events/${encodeURIComponent(uid)}`), api(`/events/${encodeURIComponent(uid)}/raw`)]);
   storageInfo ??= await api("/api/storage");
+  if (selectedUid !== uid) return;  // a newer selection superseded this one
   if (detail.error && raw.error) { $("inspector").innerHTML = `<div class="empty">${esc(detail.error)}</div>`; return; }
   const ev = detail.event, dlq = detail.dlq, md = ev?.metadata || {};
   const verified = raw.verified === true;
@@ -619,9 +753,9 @@ async function inspect(uid) {
       <div class="step"><div class="t">3 · ${ev ? "Normalized by" : "Quarantined"}</div><div class="v">${ev ? esc(`${md.parser?.id} ${md.parser?.version}`) : esc(dlq?.reason || "dlq")}</div></div>
     </div>`;
   const chain = `<dl class="kv">
-      <dt>Event UUID</dt><dd>${esc(uid)}</dd>
-      <dt>Stored SHA-256</dt><dd>${esc(raw.stored_sha256 || "–")}</dd>
-      <dt>Recomputed SHA-256</dt><dd>${esc(raw.computed_sha256 || "–")}</dd>
+      <dt>Event UUID</dt><dd>${esc(uid)}${copyBtn(uid)}</dd>
+      <dt>Stored SHA-256</dt><dd>${esc(raw.stored_sha256 || "–")}${copyBtn(raw.stored_sha256)}</dd>
+      <dt>Recomputed SHA-256</dt><dd>${esc(raw.computed_sha256 || "–")}${copyBtn(raw.computed_sha256)}</dd>
       <dt>Hash in record</dt><dd>${esc(md.raw_sha256 || dlq?.raw_sha256 || "–")}</dd>
       <dt>Ingest channel</dt><dd>${esc(md.ingest_channel || dlq?.channel || "–")}</dd>
       <dt>Ingest time</dt><dd>${esc(md.ingest_time || dlq?.ingest_time || "–")}</dd>
@@ -634,23 +768,33 @@ async function inspect(uid) {
   const panes = {
     side: compareHtml(ev, rawText, rawRef),
     normalized: ev ? `<pre class="code">${jsonHtml(ev)}</pre>` : '<div class="empty">Not normalized — see raw and chain.</div>',
-    raw: `<pre class="code">${esc(raw.raw_text ?? dlq?.raw_snippet ?? "")}</pre><p class="faint" style="font-size:12px;margin:8px 0 0">Exact bytes as received, read back from the ${esc((raw.raw_ref || "").split("://")[0] || "raw")} archive.</p>`,
+    raw: `<pre class="code">${esc(raw.raw_text ?? dlq?.raw_snippet ?? "")}</pre><p class="faint" style="font-size:var(--fs-xs);margin:8px 0 0">Exact bytes as received, read back from the ${esc((raw.raw_ref || "").split("://")[0] || "raw")} archive.</p>`,
     chain,
-    unmapped: ev?.unmapped ? `<pre class="code">${jsonHtml(ev.unmapped)}</pre><p class="faint" style="font-size:12px;margin:8px 0 0">Vendor fields without an OCSF home are kept here, not discarded.</p>` : '<div class="empty">Every token was mapped.</div>',
+    unmapped: ev?.unmapped ? `<pre class="code">${jsonHtml(ev.unmapped)}</pre><p class="faint" style="font-size:var(--fs-xs);margin:8px 0 0">Vendor fields without an OCSF home are kept here, not discarded.</p>` : '<div class="empty">Every token was mapped.</div>',
   };
   const tabs = [["side", "Side by side"], ["normalized", "Normalized (OCSF)"], ["raw", "Raw original"], ["chain", "Chain of custody"], ["unmapped", "Unmapped"]];
-  const render = () => {
-    $("inspector").innerHTML = trace + `<div class="tabs">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}" class="${k === inspTab ? "active" : ""}">${l}</button>`).join("")}</div>` + panes[inspTab];
-    $("inspector").querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => { inspTab = b.dataset.tab; render(); }));
-    if (inspTab !== "side") return;
-    bindCompare($("inspector"), rawText);
-    $("inspector").querySelector(".sbs-full").onclick = () => {
-      openModal(`Raw ↔ normalized · ${uid}`, compareHtml(ev, rawText, rawRef), true);
-      $("modal-body").querySelector(".sbs-full").remove();
-      bindCompare($("modal-body"), rawText);
-    };
+  $("inspector").innerHTML = trace + `<div class="tabs">${tabs.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join("")}</div><div class="insp-body"></div>`;
+  const body = $("inspector").querySelector(".insp-body"), built = {};
+  const show = (k) => {
+    inspTab = k;
+    $("inspector").querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === k));
+    if (!built[k]) {  // build each pane once per event, then just toggle visibility
+      const el = built[k] = document.createElement("div");
+      el.innerHTML = panes[k];
+      body.append(el);
+      if (k === "side") {
+        bindCompare(el, rawText);
+        el.querySelector(".sbs-full").onclick = () => {
+          openModal(`Raw ↔ normalized · ${uid}`, compareHtml(ev, rawText, rawRef), true);
+          $("modal-body").querySelector(".sbs-full").remove();
+          bindCompare($("modal-body"), rawText);
+        };
+      }
+    }
+    for (const [key, el] of Object.entries(built)) el.hidden = key !== k;
   };
-  render();
+  $("inspector").querySelector(".tabs").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) show(b.dataset.tab); };
+  show(inspTab);
 }
 
 // ---------------------------------------------------------------- self-heal
@@ -719,8 +863,8 @@ function checksHtml(v) {
   return `<div class="checks">
     <div><span class="ic ${v.match_rate >= 0.9 ? "ok" : v.match_rate >= 0.5 ? "warn" : "bad"}">${v.match_rate >= 0.5 ? "✓" : "✗"}</span><span>Parses <b>${v.parsed}/${v.total}</b> cluster samples end-to-end (tokenize → OCSF → schema)</span></div>
     <div><span class="ic ${reg.passed ? "ok" : "bad"}">${reg.passed ? "✓" : "✗"}</span><span>Regression corpus: ${reg.passed ? `all ${reg.total} known events still route to the same parser` : `${reg.failed} failure(s)`}</span></div>
-    ${(reg.failures || []).slice(0, 4).map((f) => `<div><span class="ic bad">·</span><span class="mono" style="font-size:11.5px">${esc(f)}</span></div>`).join("")}
-    ${(v.errors || []).map((e) => `<div><span class="ic warn">!</span><span class="mono" style="font-size:11.5px">${esc(e)}</span></div>`).join("")}
+    ${(reg.failures || []).slice(0, 4).map((f) => `<div><span class="ic bad">·</span><span class="mono" style="font-size:var(--fs-2xs)">${esc(f)}</span></div>`).join("")}
+    ${(v.errors || []).map((e) => `<div><span class="ic warn">!</span><span class="mono" style="font-size:var(--fs-2xs)">${esc(e)}</span></div>`).join("")}
   </div>`;
 }
 async function openProposal(id) {
@@ -740,7 +884,7 @@ async function openProposal(id) {
       ${(aw.notes || []).map((n) => `<div><span class="ic info">i</span><span>${esc(n)}</span></div>`).join("")}
       ${(aw.recommendations || []).map((n) => `<div><span class="ic warn">→</span><span>${esc(n)}</span></div>`).join("")}
       ${(aw.similar_parsers || []).map((s) => `<div><span class="ic info">≈</span><span><b class="mono">${esc(s.source_id)}</b>: ${esc(s.reason)}</span></div>`).join("")}
-      ${(aw.conflicts || []).map((c) => `<div><span class="ic warn">!</span><span class="mono" style="font-size:11.5px">${esc(c)}</span></div>`).join("")}
+      ${(aw.conflicts || []).map((c) => `<div><span class="ic warn">!</span><span class="mono" style="font-size:var(--fs-2xs)">${esc(c)}</span></div>`).join("")}
     </div>` : ""}
     <div style="margin-top:12px"><textarea class="yaml" id="rv-yaml" spellcheck="false" ${open ? "" : "readonly"}>${esc(p.yaml)}</textarea></div>
     <div class="actions-row">
@@ -750,8 +894,8 @@ async function openProposal(id) {
       <button class="btn danger" id="rv-dismiss" type="button">Dismiss</button>` : ""}
     </div>
     <div class="review-grid">
-      <div><div class="muted" style="font-size:12px;margin-bottom:6px">Sample raw event</div><pre class="code" id="rv-raw">${esc(p.validation?.preview_raw || "")}</pre></div>
-      <div><div class="muted" style="font-size:12px;margin-bottom:6px">Would normalize to</div><pre class="code" id="rv-preview">${p.validation?.preview ? jsonHtml(p.validation.preview) : '<span class="faint">no sample parsed</span>'}</pre></div>
+      <div><div class="muted" style="font-size:var(--fs-xs);margin-bottom:6px">Sample raw event</div><pre class="code" id="rv-raw">${esc(p.validation?.preview_raw || "")}</pre></div>
+      <div><div class="muted" style="font-size:var(--fs-xs);margin-bottom:6px">Would normalize to</div><pre class="code" id="rv-preview">${p.validation?.preview ? jsonHtml(p.validation.preview) : '<span class="faint">no sample parsed</span>'}</pre></div>
     </div>`;
   if (!open) return;
   $("rv-validate").onclick = async () => {
@@ -792,14 +936,13 @@ $("sh-settings").onsubmit = async (e) => {
 };
 
 // ---------------------------------------------------------------- parsers
-const CLASS_NAME = { 4001: "Network Activity", 4002: "HTTP Activity", 2004: "Detection Finding", 1007: "Process Activity", 3002: "Authentication", 4003: "DNS Activity", 0: "Base Event" };
 async function loadParsers() {
   parsersCache = await api("/api/parsers");
   const sel = $("ev-source"), cur = sel.value;
   sel.innerHTML = '<option value="">All sources</option>' + parsersCache.map((p) => `<option value="${esc(p.source_id)}">${esc(p.source_id)}</option>`).join("");
   sel.value = cur;
   $("parser-rows").innerHTML = parsersCache.map((p) => `<tr>
-    <td class="mono"><b>${esc(p.source_id)}</b><div class="faint" style="font-size:11px">${esc(p.file)}</div></td>
+    <td class="mono"><b>${esc(p.source_id)}</b><div class="faint" style="font-size:var(--fs-2xs)">${esc(p.file)}</div></td>
     <td>${esc(p.product?.vendor_name)} ${esc(p.product?.name)}</td>
     <td><span class="pill">${esc(p.version)}</span></td>
     <td class="mono">${esc(p.tokenizer)}</td>
@@ -838,6 +981,10 @@ async function refreshCurrent() {
 }
 setInterval(() => { if (current === "overview" || current === "selfheal") refreshCurrent(); }, 2000);
 setInterval(() => { if (current === "selfheal") loadProposals(); }, 5000);
+setInterval(() => {
+  const typing = ["ev-uid", "ev-source", "ev-class"].includes(document.activeElement?.id);
+  if (current === "events" && !selectedUid && !typing) refreshCurrent();
+}, 4000);
 setInterval(async () => { if (current !== "overview") { try { updateFooter(await api("/metrics")); } catch {} } }, 5000);
 loadParsers().then(() => { route(); loadProposals(); });
 api("/metrics").then(updateFooter).catch(() => {});
